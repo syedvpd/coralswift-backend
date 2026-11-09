@@ -59,3 +59,17 @@ Changes since the audit rerun above: `CAPTCHA_ENABLED` setting and production ru
 | Not rerun | Docker, live server, Supabase, storage, any real Brevo/Turnstile call. `--dry-run` was **not** executed against Supabase. The dry-run test uses the local test DB and monkeypatches the script's settings/engine, so `.env` is never read. |
 
 New tests: `tests/unit/test_botcheck.py` (5: success sends secret, fails closed on invalid/expired/provider error/garbage/no token, selection by `captcha_enabled`, API 403 `BOT_CHECK_FAILED` for missing/invalid/expired token and 201 for a valid one, all against a mocked Cloudflare); `tests/unit/test_config.py::test_captcha_rules`; `tests/api/test_maintenance_dry_run.py` (2: preview counts two overdue enquiries and changes nothing, the real escalation still finds both afterwards; the script's `--dry-run` never calls the real jobs, storage or email builders). The dry-run test does not cover the document-purge and expiry-reminder counters with data.
+
+## Release preparation checks (2026-11-09, latest local verification)
+Changes: `APP_ENV=staging` profile, `EMAIL_RECIPIENT_ALLOWLIST` guard, CI workflow additions, `.gitignore` additions, dry-run test with expiry/retention data.
+
+| Check | Result |
+|---|---|
+| `pytest -q` (full) | **222 passed, 0 failed** |
+| ruff / format / mypy | clean (see run output in the task summary) |
+| `alembic_test_db.py check` / `heads` (local test DB) | no new upgrade operations / `0010 (head)` |
+| `docker build` + `id -u` in the image | builds; uid 10001 |
+| Docker `run_maintenance.py --help` and `--dry-run` against the **local test database** (via `host.docker.internal`) | both exit 0; dry run printed all-zero counters on the empty database |
+| Secret scan of the 213 repository files (rules + literal `.env` values, locations only) | no live value of `DATABASE_URL`, `S3_*` or `SECRET_KEY` found; remaining matches are placeholders and fake test strings |
+| Git | `git init -b main`; baseline commit `c9ea50634c7a41c6dd82acc143d6c30e4347afc7`; clean at commit time; the release-preparation changes listed above are uncommitted (no second commit was authorised) |
+| Not executed | GitHub Actions run (no remote), `actionlint` (tool use was declined), Render validation, any staging scenario, real Brevo/Turnstile/storage, `--dry-run` or any job against Supabase |

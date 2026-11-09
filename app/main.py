@@ -49,9 +49,9 @@ def create_app(
         debug=settings.debug,
         lifespan=lifespan,
         # API docs are not exposed in production.
-        docs_url=None if settings.is_production else "/docs",
-        redoc_url=None if settings.is_production else "/redoc",
-        openapi_url=None if settings.is_production else "/openapi.json",
+        docs_url=None if settings.is_hardened else "/docs",
+        redoc_url=None if settings.is_hardened else "/redoc",
+        openapi_url=None if settings.is_hardened else "/openapi.json",
     )
     app.state.settings = settings
     app.state.engine = engine
@@ -83,6 +83,6 @@ def create_app(
         expose_headers=[REQUEST_ID_HEADER],
     )
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_request_body_bytes)
-    app.add_middleware(SecurityHeadersMiddleware, hsts=settings.is_production)
+    app.add_middleware(SecurityHeadersMiddleware, hsts=settings.is_hardened)
     app.add_middleware(RequestContextMiddleware)
     return app

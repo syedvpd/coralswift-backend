@@ -1,0 +1,75 @@
+# Render Blueprint for STAGING only. Apply this file (not render.yaml, which describes production).
+# Every credential is `sync: false`: enter staging-only values in the Render dashboard. Never reuse
+# development or production credentials, databases or buckets here.
+services:
+  - type: web
+    name: coralswift-api-staging
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health/live
+    # No preDeployCommand on purpose: apply `alembic upgrade head` manually against the staging
+    # database only after the target is confirmed (see docs/deployment/staging-release-checklist.md).
+    envVars:
+      - {key: APP_ENV, value: staging}        # same strict profile as production + recipient allow-list
+      - {key: DEBUG, value: "false"}
+      - {key: LOG_LEVEL, value: INFO}
+      - {key: STAFF_MFA_REQUIRED, value: "true"}
+      - {key: CAPTCHA_ENABLED, value: "true"}
+      - {key: STORAGE_BACKEND, value: s3}
+      - {key: EMAIL_BACKEND, value: brevo}
+      - {key: RATE_LIMIT_PER_MINUTE, value: "10"}
+      - {key: MAX_REQUEST_BODY_BYTES, value: "12582912"}
+      - {key: DATABASE_URL, sync: false}               # staging database only
+      - {key: SECRET_KEY, sync: false}                 # newly generated, unique to staging
+      - {key: TURNSTILE_SECRET_KEY, sync: false}       # Turnstile widget limited to the staging hostname
+      - {key: CORS_ALLOWED_ORIGINS, sync: false}       # staging frontend origin(s), no "*"
+      - {key: ALLOWED_HOSTS, sync: false}              # staging API hostname, no "*"
+      - {key: PORTAL_BASE_URL, sync: false}
+      - {key: S3_ENDPOINT_URL, sync: false}
+      - {key: S3_REGION, sync: false}
+      - {key: S3_BUCKET, sync: false}                  # staging bucket (private)
+      - {key: S3_PARTNER_BUCKET, sync: false}          # staging bucket (private)
+      - {key: S3_ACCESS_KEY_ID, sync: false}
+      - {key: S3_SECRET_ACCESS_KEY, sync: false}
+      - {key: BREVO_API_KEY, sync: false}
+      - {key: EMAIL_SENDER_ADDRESS, sync: false}
+      - {key: EMAIL_SENDER_NAME, value: Coral Swift (staging)}
+      - {key: EMAIL_RECIPIENT_ALLOWLIST, sync: false}  # internal test inboxes only, e.g. qa@yourdomain,@yourdomain
+      - {key: PRIVACY_NOTICE_VERSION, sync: false}
+      - {key: NOTIFY_GENERAL_EMAILS, sync: false}      # internal inboxes only (must be on the allow-list)
+      - {key: NOTIFY_PROJECT_EMAILS, sync: false}
+      - {key: NOTIFY_PARTNER_EMAILS, sync: false}
+      - {key: NOTIFY_STRATEGIC_EMAILS, sync: false}
+
+  # Staging maintenance. Starts as a dry run so nothing is purged or sent until the owner changes
+  # the command to the real one after reviewing the counts (see README, "Staff accounts and scheduled jobs").
+  - type: cron
+    name: coralswift-maintenance-staging
+    runtime: docker
+    plan: starter
+    schedule: "*/15 * * * *"
+    dockerCommand: python scripts/run_maintenance.py --dry-run
+    envVars:
+      - {key: APP_ENV, value: staging}
+      - {key: DEBUG, value: "false"}
+      - {key: STAFF_MFA_REQUIRED, value: "true"}
+      - {key: CAPTCHA_ENABLED, value: "true"}
+      - {key: STORAGE_BACKEND, value: s3}
+      - {key: EMAIL_BACKEND, value: brevo}
+      - {key: DATABASE_URL, sync: false}
+      - {key: SECRET_KEY, sync: false}
+      - {key: TURNSTILE_SECRET_KEY, sync: false}
+      - {key: ALLOWED_HOSTS, sync: false}
+      - {key: S3_ENDPOINT_URL, sync: false}
+      - {key: S3_REGION, sync: false}
+      - {key: S3_BUCKET, sync: false}
+      - {key: S3_PARTNER_BUCKET, sync: false}
+      - {key: S3_ACCESS_KEY_ID, sync: false}
+      - {key: S3_SECRET_ACCESS_KEY, sync: false}
+      - {key: BREVO_API_KEY, sync: false}
+      - {key: EMAIL_SENDER_ADDRESS, sync: false}
+      - {key: EMAIL_RECIPIENT_ALLOWLIST, sync: false}
+      - {key: NOTIFY_GENERAL_EMAILS, sync: false}
+      - {key: NOTIFY_PROJECT_EMAILS, sync: false}
+      - {key: NOTIFY_PARTNER_EMAILS, sync: false}
+      - {key: NOTIFY_STRATEGIC_EMAILS, sync: false}

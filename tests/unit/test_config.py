@@ -23,7 +23,7 @@ def make(**overrides: Any) -> Settings:
         "secret_key": GOOD_KEY,
     }
     values.update(overrides)
-    if values.get("app_env") == "production":
+    if values.get("app_env") in ("production", "staging"):
         for key, value in PROD_INTEGRATIONS.items():
             values.setdefault(key, value)
     return Settings(_env_file=None, **values)
@@ -44,6 +44,24 @@ def test_captcha_rules() -> None:
     with pytest.raises(ValidationError, match="CAPTCHA_ENABLED"):
         make(app_env="production", allowed_hosts="a.com", turnstile_secret_key=None)
     assert make().captcha_enabled is False  # dev default: explicitly off
+
+
+def test_staging_is_hardened_and_restricts_recipients() -> None:
+    base: dict[str, Any] = {"app_env": "staging", "allowed_hosts": "stg.a.com"}
+    with pytest.raises(ValidationError, match="EMAIL_RECIPIENT_ALLOWLIST"):
+        make(**base)
+    s = make(**base, email_recipient_allowlist="qa@example.com,@example.org")
+    assert s.is_hardened and not s.is_production
+    assert s.email_recipient_allowlist == ["qa@example.com", "@example.org"]
+    # same strict profile as production: missing security configuration refuses to load
+    for bad in (
+        {"debug": True},
+        {"allowed_hosts": "*"},
+        {"captcha_enabled": False},
+        {"staff_mfa_required": False},
+    ):
+        with pytest.raises(ValidationError):
+            make(**{**base, "email_recipient_allowlist": "qa@example.com", **bad})
 
 
 def test_missing_required_settings_fail(monkeypatch: pytest.MonkeyPatch) -> None:

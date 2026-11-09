@@ -98,3 +98,23 @@ def test_file_helpers() -> None:
     assert sanitize_filename("   ") == "file" and len(sanitize_filename("a" * 400 + ".pdf")) <= 150
     assert detect_kind(factories.PDF) == "pdf" and detect_kind(factories.docx_bytes()) == "docx"
     assert detect_kind(b"hello") is None
+
+
+def test_allowlist_sender_blocks_unlisted_recipients() -> None:
+    from app.integrations.email import (
+        AllowlistEmailSender,
+        ConsoleEmailSender,
+        EmailDeliveryError,
+        EmailMessage,
+    )
+
+    sender = AllowlistEmailSender(ConsoleEmailSender(), ["QA@Example.com", "@internal.test"])
+
+    def msg(to: str) -> EmailMessage:
+        return EmailMessage(to=to, subject="s", html="h", text="t")
+
+    sender.send(msg("qa@example.com"))  # exact address, case-insensitive
+    sender.send(msg("anyone@INTERNAL.test"))  # whole domain
+    for outsider in ("customer@gmail.com", "qa@example.com.evil.io", "x@sub.internal.test"):
+        with pytest.raises(EmailDeliveryError, match="allow-list"):
+            sender.send(msg(outsider))

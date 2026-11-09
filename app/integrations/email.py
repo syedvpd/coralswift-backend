@@ -76,13 +76,30 @@ class BrevoEmailSender:
         return SendResult(provider_reference=str(message_id), delivered=True)
 
 
+class AllowlistEmailSender:
+    """Staging guard: refuses any recipient outside the allow-list (address or "@domain")."""
+
+    def __init__(self, inner: EmailSender, allowlist: list[str]) -> None:
+        self._inner = inner
+        self._allowed = {item.lower() for item in allowlist}
+
+    def send(self, message: EmailMessage) -> SendResult:
+        to = message.to.lower()
+        if to not in self._allowed and "@" + to.rsplit("@", 1)[-1] not in self._allowed:
+            raise EmailDeliveryError("recipient not on this environment's allow-list")
+        return self._inner.send(message)
+
+
 def build_email_sender(settings: Settings) -> EmailSender:
+    sender: EmailSender = ConsoleEmailSender()
     if settings.email_backend == "brevo":
         if not (settings.brevo_api_key and settings.email_sender_address):
             raise ValueError("BREVO_API_KEY and EMAIL_SENDER_ADDRESS are required for brevo")
-        return BrevoEmailSender(
+        sender = BrevoEmailSender(
             settings.brevo_api_key.get_secret_value(),
             settings.email_sender_address,
             settings.email_sender_name,
         )
-    return ConsoleEmailSender()
+    if settings.email_recipient_allowlist:
+        return AllowlistEmailSender(sender, settings.email_recipient_allowlist)
+    return sender

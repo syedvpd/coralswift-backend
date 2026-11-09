@@ -58,3 +58,7 @@ Rules:
 
 ## Evidence status (2026-11-09)
 Latest local verification: 219 tests passed, ruff/format/mypy clean, `alembic check` clean (local test DB). Docker, Supabase and storage checks are from the earlier run and were not repeated. Not verified: Render blueprint validity, Brevo, Turnstile, GitHub CI, any deployed behaviour (TLS, proxy rate limit, request-size limit).
+
+## Staging first (2026-11-09)
+Production is not to be created until staging passes. `render.staging.yaml` is the staging blueprint (`APP_ENV=staging`, strict profile plus mandatory `EMAIL_RECIPIENT_ALLOWLIST`, dry-run maintenance cron, no automatic migration). Step list, credential inventory per environment, rotation procedure and the 12 verification scenarios: `staging-release-checklist.md`. Owner decisions: `../requirements/business-decision-register.md`.
+Status: staging blueprint written, not applied; no staging database, buckets, Turnstile widget or Brevo domain exist yet; CI never run on GitHub; rotation of the exposed Supabase DB password and S3 keys not done. Latest local verification: 222 tests passed.

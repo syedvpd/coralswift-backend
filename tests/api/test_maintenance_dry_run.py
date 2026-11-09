@@ -15,7 +15,9 @@ from app.core.config import Settings
 from app.modules.admin import maintenance
 from app.modules.enquiries.models import Enquiry
 from app.modules.notifications.models import Notification
+from app.modules.partner_documents.models import PartnerDocumentVersion
 from tests import factories
+from tests.fakes import InMemoryStorage, RecordingEmail
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "run_maintenance.py"
 
@@ -77,3 +79,45 @@ def test_script_dry_run_never_calls_real_jobs(
 
     assert script.main(["--dry-run"]) == 0
     assert "'dry_run': True" in capsys.readouterr().out
+
+
+def test_preview_counts_expiry_and_retention_without_touching_them(
+    client: TestClient,
+    db: Session,
+    settings: Settings,
+    email: RecordingEmail,
+    storage: InMemoryStorage,
+) -> None:
+    from tests.api.test_ops import ADM, sa_headers
+    from tests.helpers import onboard_partner
+
+    sa = sa_headers(client, db, settings)
+    p = onboard_partner(client, db, settings, email)
+    soon = (utcnow() + timedelta(days=10)).date().isoformat()
+    doc_id = client.post(
+        "/api/v1/partner/documents",
+        headers=p.headers,
+        data={"category": "registration_proof", "expires_on": soon},
+        files={"file": ("r.pdf", factories.PDF, "application/pdf")},
+    ).json()["data"]["id"]
+    client.put(f"{ADM}/settings/expiry_reminder_days", headers=sa, json={"value": "30"})
+    client.put(f"{ADM}/settings/retention.partner_document_days", headers=sa, json={"value": "1"})
+    notifications = db.scalar(select(func.count()).select_from(Notification))
+
+    first = maintenance.preview(client.app.state.sessionmaker, settings)  # type: ignore[attr-defined]
+    assert first["expiry_reminders_would_queue"] == 1 and first["documents_would_purge"] == 0
+    assert db.scalar(select(func.count()).select_from(Notification)) == notifications
+
+    client.delete(f"/api/v1/partner/documents/{doc_id}", headers=p.headers)
+    version = db.execute(select(PartnerDocumentVersion)).scalar_one()
+    db.execute(
+        update(PartnerDocumentVersion).values(retention_date=utcnow() - timedelta(seconds=1))
+    )
+    db.commit()
+
+    second = maintenance.preview(client.app.state.sessionmaker, settings)  # type: ignore[attr-defined]
+    assert second["documents_would_purge"] == 1
+    assert storage.exists(version.storage_key)  # nothing deleted from storage
+    db.refresh(version)
+    assert version.purged_at is None  # nothing marked purged
+    assert maintenance.purge_retained(db, storage) == 1  # the real job still has its work to do

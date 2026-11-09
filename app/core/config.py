@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
     app_name: str = "CoralSwift API"
-    app_env: Literal["development", "testing", "production"] = "development"
+    app_env: Literal["development", "testing", "staging", "production"] = "development"
     app_version: str = "0.1.0"
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     email_sender_address: str | None = None
     email_sender_name: str = "Coral Swift"
     notification_max_retries: int = Field(default=5, gt=0)
+    # Only these recipients (full address or "@domain") may receive mail. Required in staging so
+    # test environments can never email real customers; empty = unrestricted.
+    email_recipient_allowlist: Annotated[list[str], NoDecode] = Field(default_factory=list)
     captcha_enabled: bool = False  # explicit opt-in; production requires true
     turnstile_secret_key: SecretStr | None = None  # Cloudflare Turnstile secret
     # Internal recipients per queue. Owners are an open PRD decision, so empty = no internal mail.
@@ -94,6 +97,7 @@ class Settings(BaseSettings):
         "notify_project_emails",
         "notify_partner_emails",
         "notify_strategic_emails",
+        "email_recipient_allowlist",
         mode="before",
     )
     @classmethod
@@ -123,9 +127,11 @@ class Settings(BaseSettings):
     def _production_rules(self) -> "Settings":
         if self.captcha_enabled and not self.turnstile_secret_key:
             raise ValueError("CAPTCHA_ENABLED=true requires TURNSTILE_SECRET_KEY")
-        if self.app_env != "production":
+        if not self.is_hardened:
             return self
         problems: list[str] = []
+        if self.app_env == "staging" and not self.email_recipient_allowlist:
+            problems.append("staging needs EMAIL_RECIPIENT_ALLOWLIST (internal test inboxes only)")
         if not self.captcha_enabled:
             problems.append("production needs CAPTCHA_ENABLED=true and TURNSTILE_SECRET_KEY")
         key = self.secret_key.get_secret_value()
@@ -147,8 +153,13 @@ class Settings(BaseSettings):
         if not self.staff_mfa_required:
             problems.append("STAFF_MFA_REQUIRED must be true")
         if problems:
-            raise ValueError("Invalid production configuration: " + "; ".join(problems))
+            raise ValueError(f"Invalid {self.app_env} configuration: " + "; ".join(problems))
         return self
+
+    @property
+    def is_hardened(self) -> bool:
+        """Staging and production share the strict security profile."""
+        return self.app_env in ("staging", "production")
 
     @property
     def is_production(self) -> bool:
