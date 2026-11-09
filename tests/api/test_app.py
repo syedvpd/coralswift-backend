@@ -121,6 +121,13 @@ def test_cors_allows_phase_1_custom_headers(client: TestClient) -> None:
     assert "x-lookup-token" in allowed
 
 
+def test_root_redirects_to_swagger_in_development(client: TestClient) -> None:
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code == 307 and r.headers["location"] == "/docs"
+    assert client.get("/docs").status_code == 200
+    assert "/" not in client.get("/openapi.json").json()["paths"]
+
+
 def test_untrusted_host_rejected(client: TestClient) -> None:
     assert client.get("/health", headers={"Host": "evil.example"}).status_code == 400
 
@@ -144,4 +151,5 @@ def test_docs_disabled_in_production(settings: Settings) -> None:
         create_app(prod, storage=InMemoryStorage(), email_sender=RecordingEmail())
     ) as c:
         assert c.get("/docs").status_code == 404
+        assert c.get("/").status_code == 404  # no root redirect where docs are off
         assert "strict-transport-security" in c.get("/health").headers

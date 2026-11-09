@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.v1.router import api_router
@@ -64,6 +65,11 @@ def create_app(
     register_exception_handlers(app)
     app.include_router(health_router)
     app.include_router(api_router, prefix=settings.api_v1_prefix)
+    if not settings.is_hardened:
+        # Only where the docs are exposed: the site root opens the Swagger UI.
+        @app.get("/", include_in_schema=False)
+        def root() -> RedirectResponse:
+            return RedirectResponse("/docs")
 
     # Added first = innermost. RequestContext is outermost so every response gets a request id.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
