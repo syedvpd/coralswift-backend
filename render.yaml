@@ -1,0 +1,67 @@
+# Render Blueprint. Secrets use sync: false (set in the Render dashboard, never in this file).
+services:
+  - type: web
+    name: coralswift-api
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health/live
+    # Applies pending migrations before each deploy. Remove this line if you prefer running
+    # `alembic upgrade head` manually as a separate, approved release step.
+    preDeployCommand: alembic upgrade head
+    envVars:
+      - {key: APP_ENV, value: production}
+      - {key: DEBUG, value: "false"}
+      - {key: LOG_LEVEL, value: INFO}
+      - {key: STAFF_MFA_REQUIRED, value: "true"}
+      - {key: STORAGE_BACKEND, value: s3}
+      - {key: EMAIL_BACKEND, value: brevo}
+      - {key: DATABASE_URL, sync: false}
+      - {key: SECRET_KEY, sync: false}
+      - {key: CORS_ALLOWED_ORIGINS, sync: false}
+      - {key: ALLOWED_HOSTS, sync: false}
+      - {key: PORTAL_BASE_URL, sync: false}
+      - {key: S3_ENDPOINT_URL, sync: false}
+      - {key: S3_REGION, sync: false}
+      - {key: S3_BUCKET, sync: false}
+      - {key: S3_PARTNER_BUCKET, sync: false}
+      - {key: S3_ACCESS_KEY_ID, sync: false}
+      - {key: S3_SECRET_ACCESS_KEY, sync: false}
+      - {key: BREVO_API_KEY, sync: false}
+      - {key: EMAIL_SENDER_ADDRESS, sync: false}
+      - {key: EMAIL_SENDER_NAME, value: Coral Swift}
+      - {key: CAPTCHA_ENABLED, value: "true"}
+      - {key: TURNSTILE_SECRET_KEY, sync: false}
+      - {key: PRIVACY_NOTICE_VERSION, sync: false}
+      - {key: NOTIFY_GENERAL_EMAILS, sync: false}
+      - {key: NOTIFY_PROJECT_EMAILS, sync: false}
+      - {key: NOTIFY_PARTNER_EMAILS, sync: false}
+      - {key: NOTIFY_STRATEGIC_EMAILS, sync: false}
+
+  # Scheduled maintenance: SLA escalation, expiry reminders, retention purge, email retries.
+  - type: cron
+    name: coralswift-maintenance
+    runtime: docker
+    plan: starter
+    schedule: "*/15 * * * *"
+    dockerCommand: python scripts/run_maintenance.py
+    envVars:
+      - {key: APP_ENV, value: production}
+      - {key: DATABASE_URL, sync: false}
+      - {key: SECRET_KEY, sync: false}
+      - {key: ALLOWED_HOSTS, sync: false}
+      - {key: STORAGE_BACKEND, value: s3}
+      - {key: EMAIL_BACKEND, value: brevo}
+      - {key: STAFF_MFA_REQUIRED, value: "true"}
+      - {key: DEBUG, value: "false"}
+      - {key: S3_ENDPOINT_URL, sync: false}
+      - {key: S3_REGION, sync: false}
+      - {key: S3_BUCKET, sync: false}
+      - {key: S3_PARTNER_BUCKET, sync: false}
+      - {key: S3_ACCESS_KEY_ID, sync: false}
+      - {key: S3_SECRET_ACCESS_KEY, sync: false}
+      - {key: BREVO_API_KEY, sync: false}
+      - {key: EMAIL_SENDER_ADDRESS, sync: false}
+      - {key: NOTIFY_GENERAL_EMAILS, sync: false}
+      - {key: NOTIFY_PROJECT_EMAILS, sync: false}
+      - {key: NOTIFY_PARTNER_EMAILS, sync: false}
+      - {key: NOTIFY_STRATEGIC_EMAILS, sync: false}

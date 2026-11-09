@@ -1,0 +1,575 @@
+"""Authentication: login, sessions, invitations, password reset. Caller owns no transactions:
+each public function commits its own unit of work (security events must persist even on failure)."""
+
+import hashlib
+import logging
+import uuid
+from dataclasses import dataclass
+from datetime import timedelta
+
+from sqlalchemy import or_, select, update
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.common.utilities import utcnow
+from app.core.config import Settings
+from app.core.exceptions import AppError
+from app.modules.auth import mfa
+from app.modules.auth.constants import StaffRole, TokenPurpose, UserStatus, UserType
+from app.modules.auth.models import AuthSession, AuthToken, MfaRecoveryCode, User
+from app.modules.auth.security import (
+    burn_verify,
+    hash_password,
+    hash_token,
+    new_token,
+    validate_password_policy,
+    verify_password,
+)
+from app.modules.enquiries.activity import log_activity
+from app.modules.enquiries.constants import ActorType
+from app.modules.notifications.constants import NotificationType, TemplateKey
+from app.modules.notifications.service import queue_notification
+from app.modules.organizations.constants import MembershipRole, MembershipStatus
+from app.modules.organizations.models import PartnerMembership, PartnerOrganization
+
+logger = logging.getLogger("app.auth")
+
+
+def _invalid_credentials() -> AppError:
+    return AppError("Invalid email or password", status_code=401, code="INVALID_CREDENTIALS")
+
+
+def _invalid_refresh() -> AppError:
+    return AppError(
+        "Invalid or expired refresh token", status_code=401, code="INVALID_REFRESH_TOKEN"
+    )
+
+
+def _invalid_token() -> AppError:
+    return AppError("Invalid or expired token", status_code=400, code="INVALID_OR_EXPIRED_TOKEN")
+
+
+@dataclass(frozen=True)
+class TokenPair:
+    access_token: str
+    refresh_token: str
+    expires_in: int
+    session_id: uuid.UUID
+
+
+def active_membership(db: Session, user_id: uuid.UUID) -> PartnerMembership | None:
+    return db.execute(
+        select(PartnerMembership).where(
+            PartnerMembership.user_id == user_id,
+            PartnerMembership.status == MembershipStatus.ACTIVE,
+        )
+    ).scalar_one_or_none()
+
+
+def _actor(user: User) -> ActorType:
+    return ActorType.PARTNER if user.user_type is UserType.PARTNER else ActorType.REVIEWER
+
+
+def _audit(db: Session, user: User, action: str, meta: dict[str, object] | None = None) -> None:
+    membership = active_membership(db, user.id) if user.user_type is UserType.PARTNER else None
+    log_activity(
+        db,
+        "user",
+        user.id,
+        action,
+        meta,
+        _actor(user),
+        actor_user_id=user.id,
+        organization_id=membership.organization_id if membership else None,
+    )
+
+
+# ---------------------------------------------------------------- sessions
+def issue_session(
+    db: Session, settings: Settings, user: User, ip: str | None, user_agent: str | None
+) -> TokenPair:
+    now = utcnow()
+    access, refresh = new_token(), new_token()
+    session = AuthSession(
+        user_id=user.id,
+        access_hash=hash_token(access),
+        access_expires_at=now + timedelta(minutes=settings.access_token_expire_minutes),
+        refresh_hash=hash_token(refresh),
+        refresh_expires_at=now + timedelta(minutes=settings.refresh_token_expire_minutes),
+        ip_hash=hashlib.sha256(ip.encode()).hexdigest() if ip else None,
+        user_agent=(user_agent or "")[:200] or None,
+        created_at=now,
+    )
+    db.add(session)
+    db.flush()
+    return TokenPair(access, refresh, settings.access_token_expire_minutes * 60, session.id)
+
+
+def login(
+    db: Session,
+    settings: Settings,
+    *,
+    email: str,
+    password: str,
+    ip: str | None,
+    user_agent: str | None,
+) -> tuple[TokenPair, User]:
+    email = email.strip().lower()
+    now = utcnow()
+    user = db.execute(
+        select(User).where(User.email == email).with_for_update()
+    ).scalar_one_or_none()
+    if user is None or user.password_hash is None or user.status is not UserStatus.ACTIVE:
+        burn_verify(settings, password)
+        raise _invalid_credentials()
+    if user.locked_until and user.locked_until > now:
+        burn_verify(settings, password)
+        _audit(db, user, "auth.login_blocked_locked")
+        db.commit()
+        raise _invalid_credentials()  # same response as a wrong password
+    if not verify_password(settings, user.password_hash, password):
+        user.failed_login_count += 1
+        meta: dict[str, object] = {"failed_count": user.failed_login_count}
+        if user.failed_login_count >= settings.login_max_failures:
+            user.locked_until = now + timedelta(minutes=settings.login_lockout_minutes)
+            user.failed_login_count = 0
+            meta["locked"] = True
+        _audit(db, user, "auth.login_failed", meta)
+        db.commit()
+        raise _invalid_credentials()
+    user.failed_login_count = 0
+    user.locked_until = None
+    user.last_login_at = now
+    pair = issue_session(db, settings, user, ip, user_agent)
+    _audit(db, user, "auth.login", {"session_id": str(pair.session_id)})
+    db.commit()
+    return pair, user
+
+
+def refresh_session(db: Session, settings: Settings, refresh_token: str) -> TokenPair:
+    h = hash_token(refresh_token)
+    now = utcnow()
+    session = db.execute(
+        select(AuthSession)
+        .where(or_(AuthSession.refresh_hash == h, AuthSession.prev_refresh_hash == h))
+        .with_for_update()
+    ).scalar_one_or_none()
+    if session is None:
+        raise _invalid_refresh()
+    user = db.get(User, session.user_id)
+    if session.prev_refresh_hash == h and session.refresh_hash != h:
+        # An already-rotated refresh token was presented again: treat as theft, kill the session.
+        session.revoked_at = session.revoked_at or now
+        session.revoked_reason = "refresh_reuse"
+        if user:
+            _audit(db, user, "auth.refresh_reuse_detected", {"session_id": str(session.id)})
+        db.commit()
+        raise _invalid_refresh()
+    if (
+        session.revoked_at is not None
+        or session.refresh_expires_at <= now
+        or user is None
+        or user.status is not UserStatus.ACTIVE
+    ):
+        raise _invalid_refresh()
+    access, refresh = new_token(), new_token()
+    session.prev_refresh_hash = session.refresh_hash
+    session.refresh_hash = hash_token(refresh)
+    session.access_hash = hash_token(access)
+    session.access_expires_at = now + timedelta(minutes=settings.access_token_expire_minutes)
+    session.last_used_at = now
+    db.commit()
+    return TokenPair(access, refresh, settings.access_token_expire_minutes * 60, session.id)
+
+
+def revoke_session(db: Session, session: AuthSession, reason: str) -> None:
+    if session.revoked_at is None:
+        session.revoked_at = utcnow()
+        session.revoked_reason = reason
+
+
+def revoke_all_sessions(db: Session, user_id: uuid.UUID, reason: str) -> None:
+    db.execute(
+        update(AuthSession)
+        .where(AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None))
+        .values(revoked_at=utcnow(), revoked_reason=reason)
+    )
+
+
+# ------------------------------------------------------------ one-time tokens
+def _create_token(
+    db: Session, user: User, purpose: TokenPurpose, ttl: timedelta
+) -> tuple[str, AuthToken]:
+    now = utcnow()
+    # Newer token supersedes older unused tokens of the same purpose.
+    db.execute(
+        update(AuthToken)
+        .where(
+            AuthToken.user_id == user.id,
+            AuthToken.purpose == purpose,
+            AuthToken.used_at.is_(None),
+        )
+        .values(used_at=now)
+    )
+    raw = new_token()
+    row = AuthToken(
+        purpose=purpose,
+        token_hash=hash_token(raw),
+        user_id=user.id,
+        created_at=now,
+        expires_at=now + ttl,
+    )
+    db.add(row)
+    db.flush()
+    return raw, row
+
+
+def _consume_token(db: Session, raw: str, purpose: TokenPurpose) -> uuid.UUID:
+    """Atomically mark a token used; only one caller can ever win."""
+    row = db.execute(
+        update(AuthToken)
+        .where(
+            AuthToken.token_hash == hash_token(raw),
+            AuthToken.purpose == purpose,
+            AuthToken.used_at.is_(None),
+            AuthToken.expires_at > utcnow(),
+        )
+        .values(used_at=utcnow())
+        .returning(AuthToken.user_id)
+    ).first()
+    if row is None:
+        raise _invalid_token()
+    return uuid.UUID(str(row[0]))
+
+
+def _link(settings: Settings, path: str, raw: str) -> str:
+    return f"{settings.portal_base_url.rstrip('/')}{path}?token={raw}"
+
+
+# ----------------------------------------------------------------- invitation
+def invite_partner_user(
+    db: Session,
+    settings: Settings,
+    *,
+    inviter: User,
+    email: str,
+    full_name: str,
+    organization: PartnerOrganization,
+    role: MembershipRole = MembershipRole.OWNER,
+) -> None:
+    """Create or re-issue a pending partner account for an organization. Caller commits."""
+    email = email.strip().lower()
+    user = db.execute(
+        select(User).where(User.email == email).with_for_update()
+    ).scalar_one_or_none()
+    if user is None:
+        user = User(
+            email=email, full_name=full_name, user_type=UserType.PARTNER, status=UserStatus.INVITED
+        )
+        db.add(user)
+        db.flush()
+    elif user.user_type is not UserType.PARTNER or user.status is not UserStatus.INVITED:
+        raise AppError(
+            "An account already exists for this email", status_code=409, code="EMAIL_IN_USE"
+        )
+    membership = db.execute(
+        select(PartnerMembership).where(
+            PartnerMembership.user_id == user.id,
+            PartnerMembership.organization_id == organization.id,
+        )
+    ).scalar_one_or_none()
+    if membership is None:
+        db.add(PartnerMembership(organization_id=organization.id, user_id=user.id, role=role))
+        try:
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            raise AppError(
+                "User already belongs to another organization", status_code=409, code="EMAIL_IN_USE"
+            ) from None
+    raw, token = _create_token(
+        db, user, TokenPurpose.INVITATION, timedelta(hours=settings.invitation_ttl_hours)
+    )
+    queue_notification(
+        db,
+        recipient=user.email,
+        kind=NotificationType.ACCOUNT,
+        template=TemplateKey.PARTNER_INVITATION,
+        context={"name": user.full_name, "link": _link(settings, "/activate", raw)},
+        dedupe_key=f"invite:{token.id}",
+    )
+    log_activity(
+        db,
+        "user",
+        user.id,
+        "auth.invitation_issued",
+        {"organization_id": str(organization.id)},
+        ActorType.REVIEWER,
+        actor_user_id=inviter.id,
+        organization_id=organization.id,
+    )
+
+
+def accept_invitation(db: Session, settings: Settings, token: str, password: str) -> User:
+    # Check the policy first so a weak password does not burn the one-time token.
+    row = db.execute(
+        select(AuthToken).where(
+            AuthToken.token_hash == hash_token(token), AuthToken.purpose == TokenPurpose.INVITATION
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise _invalid_token()
+    user = db.get(User, row.user_id)
+    if user is None:
+        raise _invalid_token()
+    validate_password_policy(settings, password, user.email)
+    user_id = _consume_token(db, token, TokenPurpose.INVITATION)
+    user = db.execute(select(User).where(User.id == user_id).with_for_update()).scalar_one()
+    if user.status is UserStatus.DEACTIVATED:
+        raise _invalid_token()
+    user.password_hash = hash_password(settings, password)
+    user.status = UserStatus.ACTIVE
+    user.email_verified_at = utcnow()
+    _audit(db, user, "auth.account_activated")
+    db.commit()
+    return user
+
+
+# ------------------------------------------------------------- password reset
+def request_password_reset(db: Session, settings: Settings, email: str) -> None:
+    """Never reveals whether the address has an account (caller always answers 202)."""
+    user = db.execute(
+        select(User).where(User.email == email.strip().lower()).with_for_update()
+    ).scalar_one_or_none()
+    if user is None or user.status is not UserStatus.ACTIVE:
+        return
+    raw, token = _create_token(
+        db,
+        user,
+        TokenPurpose.PASSWORD_RESET,
+        timedelta(minutes=settings.password_reset_ttl_minutes),
+    )
+    queue_notification(
+        db,
+        recipient=user.email,
+        kind=NotificationType.ACCOUNT,
+        template=TemplateKey.PASSWORD_RESET,
+        context={"name": user.full_name, "link": _link(settings, "/reset-password", raw)},
+        dedupe_key=f"reset:{token.id}",
+    )
+    _audit(db, user, "auth.password_reset_requested")
+    db.commit()
+
+
+def confirm_password_reset(db: Session, settings: Settings, token: str, new_password: str) -> None:
+    row = db.execute(
+        select(AuthToken).where(
+            AuthToken.token_hash == hash_token(token),
+            AuthToken.purpose == TokenPurpose.PASSWORD_RESET,
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise _invalid_token()
+    user_row = db.get(User, row.user_id)
+    if user_row is None:
+        raise _invalid_token()
+    validate_password_policy(settings, new_password, user_row.email)
+    user_id = _consume_token(db, token, TokenPurpose.PASSWORD_RESET)
+    user = db.execute(select(User).where(User.id == user_id).with_for_update()).scalar_one()
+    if user.status is not UserStatus.ACTIVE:
+        raise _invalid_token()
+    user.password_hash = hash_password(settings, new_password)
+    user.failed_login_count = 0
+    user.locked_until = None
+    revoke_all_sessions(db, user.id, "password_reset")  # every old token dies
+    _audit(db, user, "auth.password_reset_completed")
+    db.commit()
+
+
+# --------------------------------------------------------------- staff helper
+def create_staff_user(
+    db: Session, settings: Settings, *, email: str, full_name: str, role: StaffRole, password: str
+) -> User:
+    """Used by scripts/create_staff_user.py only; there is no public path to create staff."""
+    validate_password_policy(settings, password, email)
+    user = User(
+        email=email.strip().lower(),
+        full_name=full_name,
+        user_type=UserType.STAFF,
+        staff_role=role,
+        status=UserStatus.ACTIVE,
+        password_hash=hash_password(settings, password),
+        email_verified_at=utcnow(),
+    )
+    db.add(user)
+    db.flush()
+    log_activity(
+        db, "user", user.id, "auth.staff_account_created", {"role": role.value}, ActorType.SYSTEM
+    )
+    return user
+
+
+# ------------------------------------------------------------------------ MFA
+def _mfa_fail(db: Session, settings: Settings, user: User) -> AppError:
+    """Wrong MFA code: counts towards the same lockout as passwords."""
+    user.failed_login_count += 1
+    meta: dict[str, object] = {"failed_count": user.failed_login_count}
+    if user.failed_login_count >= settings.login_max_failures:
+        user.locked_until = utcnow() + timedelta(minutes=settings.login_lockout_minutes)
+        user.failed_login_count = 0
+        revoke_all_sessions(db, user.id, "mfa_lockout")
+        meta["locked"] = True
+    _audit(db, user, "auth.mfa_failed", meta)
+    db.commit()
+    return AppError("Invalid verification code", status_code=401, code="INVALID_MFA_CODE")
+
+
+def begin_mfa_enrollment(db: Session, settings: Settings, user: User) -> tuple[str, str]:
+    """Create (or replace, while not yet confirmed) the secret. Returns (secret, otpauth URI)."""
+    locked = db.execute(select(User).where(User.id == user.id).with_for_update()).scalar_one()
+    if locked.mfa_enabled_at is not None:
+        raise AppError("MFA is already enabled", status_code=409, code="MFA_ALREADY_ENABLED")
+    secret = mfa.new_secret()
+    locked.mfa_secret_enc = mfa.encrypt_secret(settings, secret)
+    locked.mfa_last_step = None
+    _audit(db, locked, "auth.mfa_enrollment_started")
+    db.commit()
+    return secret, mfa.provisioning_uri(settings, locked.email, secret)
+
+
+def confirm_mfa_enrollment(
+    db: Session, settings: Settings, user: User, session: AuthSession, code: str
+) -> list[str]:
+    """Verify the first code, enable MFA, verify this session, return recovery codes once."""
+    locked = db.execute(select(User).where(User.id == user.id).with_for_update()).scalar_one()
+    if locked.mfa_enabled_at is not None or not locked.mfa_secret_enc:
+        raise AppError("Start MFA enrollment first", status_code=409, code="MFA_NOT_PENDING")
+    secret = mfa.decrypt_secret(settings, locked.mfa_secret_enc)
+    step = mfa.verify_code(secret, code, locked.mfa_last_step) if secret else None
+    if step is None:
+        raise _mfa_fail(db, settings, locked)
+    now = utcnow()
+    locked.mfa_enabled_at = now
+    locked.mfa_last_step = step
+    locked.failed_login_count = 0
+    db.execute(update(AuthSession).where(AuthSession.id == session.id).values(mfa_verified_at=now))
+    codes = mfa.new_recovery_codes()
+    for c in codes:
+        db.add(MfaRecoveryCode(user_id=locked.id, code_hash=mfa.hash_recovery_code(c)))
+    _audit(db, locked, "auth.mfa_enabled")
+    db.commit()
+    return codes
+
+
+def verify_mfa(
+    db: Session,
+    settings: Settings,
+    user: User,
+    session: AuthSession,
+    *,
+    code: str | None,
+    recovery_code: str | None,
+) -> None:
+    """Complete the second factor for this session using a TOTP code or a one-time recovery code."""
+    locked = db.execute(select(User).where(User.id == user.id).with_for_update()).scalar_one()
+    if locked.mfa_enabled_at is None or not locked.mfa_secret_enc:
+        raise AppError("MFA is not enabled", status_code=409, code="MFA_NOT_ENABLED")
+    now = utcnow()
+    if locked.locked_until and locked.locked_until > now:
+        raise AppError("Invalid verification code", status_code=401, code="INVALID_MFA_CODE")
+    ok = False
+    if recovery_code:
+        used = db.execute(
+            update(MfaRecoveryCode)
+            .where(
+                MfaRecoveryCode.user_id == locked.id,
+                MfaRecoveryCode.code_hash == mfa.hash_recovery_code(recovery_code),
+                MfaRecoveryCode.used_at.is_(None),
+            )
+            .values(used_at=now)
+            .returning(MfaRecoveryCode.id)
+        ).first()
+        ok = used is not None
+    elif code:
+        secret = mfa.decrypt_secret(settings, locked.mfa_secret_enc)
+        step = mfa.verify_code(secret, code, locked.mfa_last_step) if secret else None
+        if step is not None:
+            locked.mfa_last_step = step
+            ok = True
+    if not ok:
+        raise _mfa_fail(db, settings, locked)
+    locked.failed_login_count = 0
+    db.execute(update(AuthSession).where(AuthSession.id == session.id).values(mfa_verified_at=now))
+    _audit(db, locked, "auth.mfa_verified", {"recovery": bool(recovery_code)})
+    db.commit()
+
+
+def invite_staff_user(
+    db: Session,
+    settings: Settings,
+    *,
+    inviter: User,
+    email: str,
+    full_name: str,
+    role: StaffRole,
+) -> User:
+    """Super administrator creates a pending staff account; the invitee sets a password, then must
+    enroll MFA at first login. Caller commits."""
+    email = email.strip().lower()
+    if db.execute(select(User).where(User.email == email)).scalar_one_or_none() is not None:
+        raise AppError(
+            "An account already exists for this email", status_code=409, code="EMAIL_IN_USE"
+        )
+    user = User(
+        email=email,
+        full_name=full_name,
+        user_type=UserType.STAFF,
+        staff_role=role,
+        status=UserStatus.INVITED,
+    )
+    db.add(user)
+    db.flush()
+    raw, token = _create_token(
+        db, user, TokenPurpose.INVITATION, timedelta(hours=settings.invitation_ttl_hours)
+    )
+    queue_notification(
+        db,
+        recipient=user.email,
+        kind=NotificationType.ACCOUNT,
+        template=TemplateKey.PARTNER_INVITATION,
+        context={"name": user.full_name, "link": _link(settings, "/activate", raw)},
+        dedupe_key=f"invite:{token.id}",
+    )
+    log_activity(
+        db,
+        "user",
+        user.id,
+        "admin.staff_invited",
+        {"role": role.value},
+        ActorType.STAFF,
+        actor_user_id=inviter.id,
+    )
+    return user
+
+
+def regenerate_recovery_codes(db: Session, settings: Settings, user: User, code: str) -> list[str]:
+    """Replace all recovery codes after proving possession of the authenticator (safe recovery)."""
+    locked = db.execute(select(User).where(User.id == user.id).with_for_update()).scalar_one()
+    if locked.mfa_enabled_at is None or not locked.mfa_secret_enc:
+        raise AppError("MFA is not enabled", status_code=409, code="MFA_NOT_ENABLED")
+    secret = mfa.decrypt_secret(settings, locked.mfa_secret_enc)
+    step = mfa.verify_code(secret, code, locked.mfa_last_step) if secret else None
+    if step is None:
+        raise _mfa_fail(db, settings, locked)
+    locked.mfa_last_step = step
+    db.execute(
+        update(MfaRecoveryCode)
+        .where(MfaRecoveryCode.user_id == locked.id, MfaRecoveryCode.used_at.is_(None))
+        .values(used_at=utcnow())
+    )
+    codes = mfa.new_recovery_codes()
+    for c in codes:
+        db.add(MfaRecoveryCode(user_id=locked.id, code_hash=mfa.hash_recovery_code(c)))
+    _audit(db, locked, "auth.mfa_recovery_codes_regenerated")
+    db.commit()
+    return codes
