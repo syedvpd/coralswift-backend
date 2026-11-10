@@ -70,6 +70,21 @@ def test_template_override_is_used_and_validated(
     client: TestClient, db: Session, settings: Settings, email: RecordingEmail
 ) -> None:
     sa = sa_headers(client, db, settings)
+    placeholders = client.get(f"{ADM}/notification-templates/placeholders", headers=sa)
+    assert placeholders.status_code == 200
+    assert {row["name"] for row in placeholders.json()["data"]} == {
+        "name",
+        "reference",
+        "status_label",
+        "link",
+        "enquiry_type",
+        "company",
+        "category",
+        "expires_on",
+        "meeting_time",
+    }
+    bdm = staff_headers(client, make_staff(db, settings, StaffRole.BUSINESS_DEVELOPMENT_MANAGER))
+    assert client.get(f"{ADM}/notification-templates/placeholders", headers=bdm).status_code == 403
     url = f"{ADM}/notification-templates/ack_general"
     assert (
         client.put(url, headers=sa, json={"subject": "Hi\nBcc: x", "text_body": "t"}).status_code
@@ -149,10 +164,23 @@ def test_kpis(client: TestClient, db: Session, settings: Settings, email: Record
     assert data["partner_application_completion"]["submitted"] == 1
     assert data["portal_adoption"]["active_partner_users"] == 1
     bdm = staff_headers(client, make_staff(db, settings, StaffRole.BUSINESS_DEVELOPMENT_MANAGER))
-    assert (
-        "partner_application_completion"
-        not in client.get(f"{ADM}/reports/kpis", headers=bdm).json()["data"]
-    )
+    bdm_kpis = client.get(f"{ADM}/reports/kpis", headers=bdm).json()["data"]
+    assert bdm_kpis.get("partner_application_completion") is None  # super administrators only
+
+
+def test_typed_aggregate_reports_and_role_scopes(
+    client: TestClient, db: Session, settings: Settings
+) -> None:
+    sa = sa_headers(client, db, settings)
+    bdm = staff_headers(client, make_staff(db, settings, StaffRole.BUSINESS_DEVELOPMENT_MANAGER))
+    followups = client.get(f"{ADM}/reports/follow-ups", headers=bdm).json()["data"]
+    assert set(followups) == {"total", "by_kind", "by_status", "by_month"}
+    documents = client.get(f"{ADM}/reports/document-review", headers=sa).json()["data"]
+    assert set(documents) == {"total_versions", "by_review_status", "avg_turnaround_hours"}
+    communications = client.get(f"{ADM}/reports/communications", headers=sa).json()["data"]
+    assert set(communications) == {"total", "by_delivery_status", "by_template"}
+    assert client.get(f"{ADM}/reports/document-review", headers=bdm).status_code == 403
+    assert client.get(f"{ADM}/reports/communications", headers=bdm).status_code == 403
 
 
 def test_profile_change_request_flow_and_partner_extras(

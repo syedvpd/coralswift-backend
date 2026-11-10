@@ -43,6 +43,7 @@ class ContentItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     review_note: Mapped[str | None] = mapped_column(Text)
     last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    scheduled_publish_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     current_version: Mapped[int] = mapped_column(Integer, default=1)
     claim_ids: Mapped[list[Any]] = mapped_column(JSONB, default=list)  # claims register links
     version_label: Mapped[str | None] = mapped_column(String(40))  # e.g. "2026-11" for documents
@@ -51,10 +52,20 @@ class ContentItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     attachment_content_type: Mapped[str | None] = mapped_column(String(120))
     attachment_size: Mapped[int | None] = mapped_column(BigInteger)
     attachment_checksum: Mapped[str | None] = mapped_column(String(64))
+    # SEO / social metadata and a cover image reference (https URLs only, validated at the API)
+    seo_title: Mapped[str | None] = mapped_column(String(200))
+    seo_description: Mapped[str | None] = mapped_column(String(300))
+    canonical_url: Mapped[str | None] = mapped_column(String(500))
+    og_title: Mapped[str | None] = mapped_column(String(200))
+    og_description: Mapped[str | None] = mapped_column(String(300))
+    og_image_url: Mapped[str | None] = mapped_column(String(500))
+    image_url: Mapped[str | None] = mapped_column(String(500))
+    image_alt: Mapped[str | None] = mapped_column(String(200))
 
     __table_args__ = (
         CheckConstraint("slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'", name="slug_format"),
         Index("ix_content_status_published", "status", "published_at"),
+        Index("ix_content_status_scheduled", "status", "scheduled_publish_at"),
     )
 
 

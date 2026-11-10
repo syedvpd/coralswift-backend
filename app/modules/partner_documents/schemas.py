@@ -3,6 +3,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel
 
+from app.modules.documents.constants import ATTACHABLE_STATUSES
 from app.modules.partner_documents.constants import PartnerDocCategory
 from app.modules.partner_documents.models import PartnerDocument, PartnerDocumentVersion
 
@@ -25,6 +26,9 @@ class DocumentOut(BaseModel):
     category: PartnerDocCategory
     status: str
     current_version: VersionOut | None
+    can_replace: bool
+    can_remove: bool
+    can_download: bool
 
 
 def version_out(v: PartnerDocumentVersion) -> VersionOut:
@@ -49,4 +53,7 @@ def document_out(d: PartnerDocument, v: PartnerDocumentVersion | None) -> Docume
         category=d.category,
         status=d.status.value,
         current_version=version_out(v) if v else None,
+        can_replace=d.status.value == "active",
+        can_remove=d.status.value == "active",
+        can_download=v is not None and v.upload_status in ATTACHABLE_STATUSES,
     )

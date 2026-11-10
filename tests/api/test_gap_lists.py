@@ -28,6 +28,9 @@ UNPAGINATED = {
     "/api/v1/admin/assignees",  # active staff only, a handful
     "/api/v1/auth/sessions",  # your own sessions
     "/api/v1/reviewer/transitions",  # the fixed rule table
+    "/api/v1/admin/audit/actions",  # event catalogue
+    "/api/v1/admin/notification-templates/placeholders",  # fixed allow-list
+    "/api/v1/partner/organization/editable-fields",  # field metadata
 }
 
 
@@ -121,7 +124,17 @@ def test_partner_inbox_read_state_isolation_and_unread_counts(
     first = client.get("/api/v1/partner/notifications", headers=a.headers).json()
     assert first["meta"]["total"] == first["meta"]["unread"] == 2
     item = first["data"][0]
-    assert set(item) == {"id", "template", "delivery_status", "created_at", "read_at", "is_read"}
+    assert set(item) == {
+        "id",
+        "template",
+        "title",
+        "category",
+        "related_reference",
+        "delivery_status",
+        "created_at",
+        "read_at",
+        "is_read",
+    }
     assert item["is_read"] is False and "link" not in item
     foreign = client.get("/api/v1/partner/notifications", headers=b.headers).json()["data"][0]["id"]
     assert (

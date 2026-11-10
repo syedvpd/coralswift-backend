@@ -88,6 +88,14 @@ class CompletionOut(BaseModel):
     complete: bool
 
 
+class EditableFieldOut(BaseModel):
+    name: str
+    direct_update: bool
+    approval_required: bool
+    nullable: bool
+    null_clears: bool
+
+
 class RevisionOut(BaseModel):
     version: int
     changed_by: uuid.UUID

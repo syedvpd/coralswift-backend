@@ -42,3 +42,31 @@ IDOR and organisation isolation (`test_security_p2`, `test_partner_documents`, `
 - Concurrency tests for the new follow-up and assignment operations were not added; existing row locks (`FOR UPDATE`) are used but not stress-tested.
 - No test sends real email or contacts Cloudflare; Turnstile and Brevo remain mock-only.
 - Migration `0011` was applied only to local disposable databases.
+
+## Claude Code continuation (2026-11-10)
+Verified 2026-11-10 (Claude Code): branch `main`, HEAD `15ebe59`; the working tree is uncommitted and holds the earlier agent's 34 modified files plus this session's changes. Supabase dev (`postgres.zibfzlwzaecapfrgjret`) is at `0012` with no drift (read-only check). **Migrations `0013`, `0014`, `0015` exist and are applied to local disposable databases only; they are NOT applied to Supabase** (needs a fresh approval, a backup and target confirmation).
+
+| Check | Result |
+|---|---|
+| Baseline of the uncommitted tree before my changes | 250 passed, **7 failed** (null keys in typed responses; 500 in `/admin/reports/follow-ups`) |
+| After fixing those | 257 passed |
+| Final `pytest -q` (after Phase 1-3 work) | **270 passed, 0 failed** (162 s) |
+| `ruff check .` / `ruff format --check .` / `mypy` | clean / 241 files / 180 source files |
+| Fresh empty database, `alembic upgrade head`/`current`/`check` | exit 0 / `0015 (head)` / no drift |
+| OpenAPI | regenerated: 3.1.0, 158 paths, 276 schemas (`docs/api/openapi.json`) |
+| Docker | image builds; uid 10001 |
+| Supabase | read-only verification only (revision `0012`, six columns present, no drift); nothing applied |
+| Not run | GitHub CI, Render, live Brevo/Turnstile, container health with a database |
+
+New tests this session: `test_phase1_seo_privacy.py` (4), `test_phase2_account.py` (4), `test_phase2_privacy.py` (1), `test_phase2_document_requests.py` (2), `test_phase3_feed.py` (2); updated `test_content_engagement.py`, `test_section28.py`, `test_gap_accounts.py`, `test_admin.py`, `test_ops.py`, `test_gap_lists.py`.
+
+## Second pass (2026-11-10, local only)
+| Check | Result |
+|---|---|
+| `pytest -q` (full) | **273 passed, 0 failed** (125 s) |
+| `ruff check` on `app`, `tests`, `migrations` and the maintained scripts / `ruff format --check` / `mypy` | clean / 245 files / 182 source files |
+| `ruff check .` | **17 E402 errors in `scripts/inspect_and_seed.py`**, a file added by another agent after my last run (not mine, not edited; it also targets the `.env` database, so it was not run) |
+| Fresh empty database `alembic upgrade head` / `check` | exit 0, head `0015`, no drift |
+| OpenAPI regenerated | 162 paths, 280 schemas |
+| Not run | GitHub CI, Render, live providers, anything on Supabase |
+New tests: `test_phase3_org_history.py` (3). Changed: `test_gap_lists.py`.

@@ -82,7 +82,7 @@ def test_bdm_cannot_see_strategic_or_financial_data(
     p_adm = client.get(f"{ADM}/enquiries/{by_ref[refs['partner']]}", headers=admin).json()["data"][
         "details"
     ]
-    assert "turnover_range" not in p_bdm and "client_references" not in p_bdm
+    assert p_bdm.get("turnover_range") is None and p_bdm.get("client_references") is None
     assert "turnover_range" in p_adm
     assert client.get(f"{ADM}/enquiries?type=strategic", headers=bdm).json()["data"] == []
     csv_bdm = client.get(f"{ADM}/reports/enquiries.csv", headers=bdm).text
@@ -261,7 +261,8 @@ def test_organizations_and_staff_management(
     )
     other = make_staff(db, settings, StaffRole.PARTNER_REVIEWER)
     other_h = staff_headers(client, other)
-    assert client.get("/api/v1/auth/me", headers=other_h).status_code == 200
+    me = client.get("/api/v1/auth/me", headers=other_h)
+    assert me.status_code == 200 and me.json()["data"]["account_status"] == "active"
     assert client.post(f"{ADM}/users/{other.id}/deactivate", headers=admin).status_code == 200
     assert client.get("/api/v1/auth/me", headers=other_h).status_code == 401  # sessions revoked
 
@@ -275,4 +276,4 @@ def test_audit_log_super_admin_only(client: TestClient, db: Session, settings: S
     assert r["meta"]["total"] == 4 and all(a["action"] == "enquiry.submitted" for a in r["data"])
     ov = client.get(f"{ADM}/overview", headers=admin).json()["data"]
     assert ov["unassigned_enquiries"] == 4 and "recent_activity" in ov and "applications" in ov
-    assert "applications" not in client.get(f"{ADM}/overview", headers=bdm).json()["data"]
+    assert client.get(f"{ADM}/overview", headers=bdm).json()["data"].get("applications") is None

@@ -55,6 +55,18 @@ def test_accounts_are_super_admin_only_filterable_and_sortable(
     onboard_partner(client, db, settings, email, org_name="Acme Dispatch Ltd")
     body = client.get(f"{ADM}/accounts?page_size=100", headers=sa).json()
     assert body["meta"]["total"] == len(body["data"]) >= 3
+    metrics = client.get(f"{ADM}/accounts/metrics", headers=sa)
+    metric_data = metrics.json()["data"]
+    assert metric_data["total_accounts"] == body["meta"]["total"]
+    assert metric_data["active_partner_accounts"] == 1
+    assert sum(metric_data["staff_by_role"].values()) >= 1
+    assert (
+        client.get(
+            f"{ADM}/accounts/metrics",
+            headers=_hdr(client, db, settings, StaffRole.BUSINESS_DEVELOPMENT_MANAGER),
+        ).status_code
+        == 403
+    )
     partners = client.get(f"{ADM}/accounts?user_type=partner", headers=sa).json()["data"]
     assert partners and all(a["user_type"] == "partner" for a in partners)
     assert partners[0]["organization"]["legal_name"] == "Acme Dispatch Ltd"
@@ -66,11 +78,34 @@ def test_accounts_are_super_admin_only_filterable_and_sortable(
     assert [a["email"] for a in asc] == sorted(a["email"] for a in asc)
     assert client.get(f"{ADM}/accounts?sort=password", headers=sa).status_code == 422
     one = client.get(f"{ADM}/accounts/{partners[0]['id']}", headers=sa).json()["data"]
+    assert "invitation_delivery_status" in one and "invitation_delivery_at" in one
     assert one["recent_activity"] and "password" not in str(one).lower().replace(
         "password_reset", ""
     )
     unknown = client.get(f"{ADM}/accounts/00000000-0000-0000-0000-000000000000", headers=sa)
     assert unknown.status_code == 404
+
+
+def test_staff_self_profile_update_is_scoped_and_audited(
+    client: TestClient, db: Session, settings: Settings, email: RecordingEmail
+) -> None:
+    from app.modules.enquiries.models import Activity
+
+    staff_user = make_staff(db, settings, StaffRole.SUPER_ADMINISTRATOR)
+    h = bearer(login(client, staff_user.email)["access_token"])
+    response = client.patch(f"{A}/me", headers=h, json={"full_name": "Updated Staff Name"})
+    assert (
+        response.status_code == 200 and response.json()["data"]["full_name"] == "Updated Staff Name"
+    )
+    assert response.json()["data"]["account_status"] == "active"
+    assert (
+        client.patch(f"{A}/me", headers=h, json={"email": "changed@example.com"}).status_code == 422
+    )
+    activity = db.query(Activity).filter_by(action="auth.profile_updated").one()
+    assert activity.actor_user_id == staff_user.id and activity.meta == {"fields": ["full_name"]}
+    partner = onboard_partner(client, db, settings, email)
+    own = client.patch(f"{A}/me", headers=partner.headers, json={"full_name": "Partner Name"})
+    assert own.status_code == 200 and own.json()["data"]["full_name"] == "Partner Name"
 
 
 def test_invitation_lifecycle_resend_revoke_and_distinct_errors(
@@ -88,6 +123,8 @@ def test_invitation_lifecycle_resend_revoke_and_distinct_errors(
     )
     assert invited.status_code == 201
     uid = invited.json()["data"]["id"]
+    invite_account = client.get(f"{ADM}/accounts/{uid}", headers=sa).json()["data"]
+    assert invite_account["invitation_delivery_status"] in {"pending", "sent", "logged", "failed"}
 
     def state() -> str:
         return str(

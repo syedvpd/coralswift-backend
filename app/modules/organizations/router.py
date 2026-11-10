@@ -8,6 +8,7 @@ from app.modules.auth.dependencies import PartnerDep
 from app.modules.organizations import service
 from app.modules.organizations.schemas import (
     CompletionOut,
+    EditableFieldOut,
     OrganizationOut,
     ProfileUpdate,
     RevisionOut,
@@ -45,6 +46,29 @@ def update_own(
 @router.get("/completion", response_model=ApiResponse[CompletionOut], responses=_ERR)
 def get_completion(ctx: PartnerDep, db: DbSession) -> ApiResponse[CompletionOut]:
     return ok(service.completion(service.get_organization(db, ctx.organization_id)))
+
+
+@router.get(
+    "/editable-fields",
+    response_model=ApiResponse[list[EditableFieldOut]],
+    responses=_ERR,
+    summary="Profile fields and direct-update/null-clearing behavior",
+)
+def editable_fields(ctx: PartnerDep) -> ApiResponse[list[EditableFieldOut]]:
+    del ctx  # authentication is required; metadata is shared by every partner
+    return ok(
+        [
+            EditableFieldOut(
+                name=name,
+                direct_update=True,
+                approval_required=False,
+                nullable=name != "legal_name",
+                null_clears=name != "legal_name",
+            )
+            for name in ProfileUpdate.model_fields
+            if name != "expected_version"
+        ]
+    )
 
 
 @router.get("/history", response_model=ApiResponse[list[RevisionOut]], responses=_ERR)

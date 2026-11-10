@@ -2,7 +2,7 @@ import hashlib
 import hmac
 import secrets
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, func, select, update
@@ -12,6 +12,7 @@ from app.common.utilities import utcnow
 from app.core.config import Settings
 from app.core.exceptions import AppError, NotFoundError
 from app.modules.auth.dependencies import StaffContext
+from app.modules.auth.security import hash_token, new_token
 from app.modules.engagement.models import (
     MeetingRequest,
     MeetingStatus,
@@ -195,15 +196,35 @@ def unsubscribe(db: Session, settings: Settings, email: str, token: str) -> None
 
 
 # ---------------------------------------------------------- privacy requests
+PRIVACY_VERIFY_HOURS = 72  # shortcut: fixed window; make it a setting if the owner wants another
+
+
 def create_privacy_request(
-    db: Session, settings: Settings, email: str, kind: PrivacyRequestKind, details: str | None
+    db: Session,
+    settings: Settings,
+    email: str,
+    kind: PrivacyRequestKind,
+    details: str | None,
+    *,
+    submitted_by: uuid.UUID | None = None,
 ) -> PrivacyRequest:
+    """Public requests must confirm the address by email link; a signed-in partner is already
+    identified by the session, so the request is verified at creation."""
     row = PrivacyRequest(
         reference="PR-" + secrets.token_hex(5).upper(),
         email=email.strip().lower(),
         kind=kind,
         details=details,
+        submitted_by_user_id=submitted_by,
     )
+    context = {"reference": row.reference}
+    if submitted_by is not None:
+        row.email_verified_at = utcnow()
+    else:
+        raw = new_token()
+        row.verification_token_hash = hash_token(raw)
+        row.verification_expires_at = utcnow() + timedelta(hours=PRIVACY_VERIFY_HOURS)
+        context["link"] = f"{settings.portal_base_url.rstrip('/')}/privacy/verify?token={raw}"
     db.add(row)
     db.flush()
     queue_notification(
@@ -211,7 +232,7 @@ def create_privacy_request(
         recipient=row.email,
         kind=NotificationType.ACKNOWLEDGEMENT,
         template=TemplateKey.PRIVACY_REQUEST_ACK,
-        context={"reference": row.reference},
+        context=context,
         dedupe_key=f"privacy-ack:{row.id}",
     )
     for address in settings.notify_general_emails:
@@ -226,6 +247,33 @@ def create_privacy_request(
     log_activity(db, "privacy_request", row.id, "privacy.request_received", {"kind": kind.value})
     db.commit()
     return row
+
+
+def verify_privacy_email(db: Session, token: str) -> PrivacyRequest:
+    row = db.execute(
+        select(PrivacyRequest)
+        .where(PrivacyRequest.verification_token_hash == hash_token(token))
+        .with_for_update()
+    ).scalar_one_or_none()
+    if row is None:
+        raise AppError("Invalid or expired link", status_code=400, code="INVALID_OR_EXPIRED_TOKEN")
+    if row.verification_expires_at is None or row.verification_expires_at <= utcnow():
+        raise AppError("This link has expired", status_code=400, code="TOKEN_EXPIRED")
+    row.email_verified_at = utcnow()
+    row.verification_token_hash = None  # single use
+    row.verification_expires_at = None
+    log_activity(db, "privacy_request", row.id, "privacy.email_verified", {})
+    db.commit()
+    return row
+
+
+def _require_verified(row: PrivacyRequest) -> None:
+    if row.email_verified_at is None:
+        raise AppError(
+            "The requester has not confirmed their email address yet",
+            status_code=409,
+            code="EMAIL_NOT_VERIFIED",
+        )
 
 
 def list_privacy_requests(
@@ -255,6 +303,8 @@ def update_privacy_request(
     ).scalar_one_or_none()
     if row is None:
         raise NotFoundError("Request not found")
+    if status is not PrivacyRequestStatus.REJECTED:  # an unverified request may only be rejected
+        _require_verified(row)
     row.status, row.resolution_note, row.handled_by = status, note, staff.user.id
     log_activity(
         db,
@@ -282,6 +332,7 @@ def execute_deletion(db: Session, staff: StaffContext, request_id: uuid.UUID) ->
     ).scalar_one_or_none()
     if row is None:
         raise NotFoundError("Request not found")
+    _require_verified(row)
     if (
         row.kind is not PrivacyRequestKind.DELETION
         or row.status is not PrivacyRequestStatus.IN_PROGRESS

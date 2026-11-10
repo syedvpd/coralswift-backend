@@ -20,6 +20,9 @@ from app.integrations.email import EmailSender
 from app.integrations.storage import Storage, StorageError
 from app.modules.admin import settings_service as cfg
 from app.modules.applications.service import partner_users
+from app.modules.content import service as content_service
+from app.modules.content.constants import ContentStatus
+from app.modules.content.models import ContentItem
 from app.modules.documents.constants import ATTACHABLE_STATUSES
 from app.modules.enquiries.activity import log_activity
 from app.modules.enquiries.constants import ActorType, EnquiryStatus
@@ -150,6 +153,44 @@ def purge_retained(db: Session, storage: Storage) -> int:
     return purged
 
 
+def publish_scheduled_content(db: Session) -> int:
+    now = utcnow()
+    rows = db.execute(
+        select(ContentItem)
+        .where(
+            ContentItem.status == ContentStatus.APPROVED,
+            ContentItem.scheduled_publish_at <= now,
+        )
+        .order_by(ContentItem.scheduled_publish_at, ContentItem.id)
+        .limit(100)
+        .with_for_update(skip_locked=True)
+    ).scalars()
+    published = 0
+    for item in rows:
+        if content_service.claim_problems(db, item):
+            continue
+        item.status = ContentStatus.PUBLISHED
+        item.published_at = now
+        item.scheduled_publish_at = None
+        log_activity(
+            db, "content", item.id, "content.published", {"slug": item.slug}, ActorType.SYSTEM
+        )
+        published += 1
+    db.commit()
+    return published
+
+
+def scheduled_content_due(db: Session) -> int:
+    now = utcnow()
+    rows = db.execute(
+        select(ContentItem).where(
+            ContentItem.status == ContentStatus.APPROVED,
+            ContentItem.scheduled_publish_at <= now,
+        )
+    ).scalars()
+    return sum(1 for item in rows if not content_service.claim_problems(db, item))
+
+
 def run_all(
     factory: sessionmaker[Session], settings: Settings, storage: Storage, sender: EmailSender
 ) -> dict[str, int]:
@@ -161,6 +202,8 @@ def run_all(
         result["expiry_reminders_queued"] = send_expiry_reminders(db)
     with factory() as db:
         result["documents_purged"] = purge_retained(db, storage)
+    with factory() as db:
+        result["content_published"] = publish_scheduled_content(db)
     result["notifications_dispatched"] = dispatch_notifications(factory, sender, settings)
     return result
 
@@ -187,6 +230,7 @@ def preview(factory: sessionmaker[Session], settings: Settings) -> dict[str, int
             "sla_would_escalate": len(db.execute(_overdue()).scalars().all()),
             "expiry_reminders_would_queue": reminders,
             "documents_would_purge": len(db.execute(_purgeable()).scalars().all()),
+            "content_would_publish": scheduled_content_due(db),
             "notifications_would_dispatch": int(
                 db.scalar(
                     select(func.count())

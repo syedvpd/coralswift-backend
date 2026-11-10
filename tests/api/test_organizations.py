@@ -53,6 +53,11 @@ def test_profile_update_completion_and_history(
     r = client.put(ORG, headers=p.headers, json=FULL)
     data = r.json()["data"]
     assert r.status_code == 200 and data["profile_version"] == 2 and data["country"] == "IN"
+    meta = client.get(f"{ORG}/editable-fields", headers=p.headers).json()["data"]
+    website_meta = next(item for item in meta if item["name"] == "website")
+    assert website_meta["direct_update"] and website_meta["null_clears"]
+    legal_name_meta = next(item for item in meta if item["name"] == "legal_name")
+    assert legal_name_meta["null_clears"] is False
     comp = client.get(f"{ORG}/completion", headers=p.headers).json()["data"]
     assert comp == {"percent": 100, "missing_fields": [], "complete": True}
     hist = client.get(f"{ORG}/history", headers=p.headers).json()["data"]
@@ -61,6 +66,11 @@ def test_profile_update_completion_and_history(
     # unchanged resubmission creates no new revision
     client.put(ORG, headers=p.headers, json=FULL)
     assert len(client.get(f"{ORG}/history", headers=p.headers).json()["data"]) == 2
+    cleared = client.put(ORG, headers=p.headers, json={"website": None})
+    assert cleared.status_code == 200 and cleared.json()["data"]["website"] is None
+    latest = client.get(f"{ORG}/history", headers=p.headers).json()["data"][0]
+    assert latest["changes"]["website"]["new"] is None
+    assert client.put(ORG, headers=p.headers, json={"legal_name": None}).status_code == 422
 
 
 def test_validation_and_optimistic_concurrency(

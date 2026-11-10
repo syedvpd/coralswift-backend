@@ -14,6 +14,7 @@ from sqlalchemy import func, or_, select
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
 from app.core.config import Settings, get_settings
+from app.core.exceptions import NotFoundError
 from app.database.dependencies import DbSession
 from app.modules.admin import lookups
 from app.modules.applications.constants import PortalStatus
@@ -56,6 +57,15 @@ class DocumentQueueRow(BaseModel):
     purged: bool
 
 
+class DocumentReviewHistoryRow(BaseModel):
+    version_no: int
+    review_status: ReviewStatus
+    review_comment: str | None
+    reviewed_by_name: str | None
+    reviewed_at: datetime | None
+    uploaded_at: datetime
+
+
 _SORTS: dict[str, tuple[Any, ...]] = {
     "-uploaded_at": (PartnerDocumentVersion.uploaded_at.desc(), PartnerDocument.id.desc()),
     "uploaded_at": (PartnerDocumentVersion.uploaded_at.asc(), PartnerDocument.id.asc()),
@@ -93,6 +103,7 @@ def document_queue(
         )
         .join(PartnerOrganization, PartnerOrganization.id == PartnerDocument.organization_id)
     )
+
     if not staff.is_super_admin:  # reviewers: only organisations whose application is theirs
         stmt = stmt.where(
             PartnerDocument.organization_id.in_(
@@ -152,6 +163,58 @@ def document_queue(
                 purged=v.purged_at is not None,
             )
             for d, v, org in rows
+        ],
+        meta=page_meta(page, total),
+    )
+
+
+@router.get(
+    "/documents/{document_id}/history",
+    response_model=ApiResponse[list[DocumentReviewHistoryRow]],
+    responses={**_ERR, 404: {"model": ErrorResponse}},
+    summary="Document versions and their staff review outcomes",
+)
+def document_review_history(
+    document_id: uuid.UUID, staff: ReviewerDep, db: DbSession, page: PageDep
+) -> ApiResponse[list[DocumentReviewHistoryRow]]:
+    document = db.get(PartnerDocument, document_id)
+    if document is None:
+        raise NotFoundError("Document not found")
+    if not staff.is_super_admin:
+        assigned = db.execute(
+            select(PortalApplication.id)
+            .where(
+                PortalApplication.organization_id == document.organization_id,
+                PortalApplication.assigned_reviewer_id == staff.user.id,
+                PortalApplication.status != PortalStatus.DRAFT,
+            )
+            .limit(1)
+        ).first()
+        if assigned is None:
+            raise NotFoundError("Document not found")
+    version_stmt = select(PartnerDocumentVersion).where(
+        PartnerDocumentVersion.document_id == document.id
+    )
+    total = db.execute(select(func.count()).select_from(version_stmt.subquery())).scalar_one()
+    versions = list(
+        db.execute(
+            version_stmt.order_by(PartnerDocumentVersion.version_no.desc())
+            .limit(page.page_size)
+            .offset(page.offset)
+        ).scalars()
+    )
+    names = lookups.user_names(db, (v.reviewed_by for v in versions if v.reviewed_by))
+    return ok(
+        [
+            DocumentReviewHistoryRow(
+                version_no=v.version_no,
+                review_status=v.review_status,
+                review_comment=v.review_comment,
+                reviewed_by_name=names.get(v.reviewed_by) if v.reviewed_by else None,
+                reviewed_at=v.reviewed_at,
+                uploaded_at=v.uploaded_at,
+            )
+            for v in versions
         ],
         meta=page_meta(page, total),
     )

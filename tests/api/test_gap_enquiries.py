@@ -60,6 +60,22 @@ def test_enquiry_rows_carry_names_phone_category_and_filter_server_side(
     )
     assert client.get(f"{ADM}/enquiries?assigned_any=true", headers=sa).json()["meta"]["total"] == 1
     assert client.get(f"{ADM}/enquiries?category=nonsense", headers=sa).status_code == 422
+    strategic = client.post(f"{PUB}/strategic", json=factories.strategic()).json()["data"][
+        "reference_number"
+    ]
+    strategic_rows = client.get(f"{ADM}/enquiries?discussion_type=merger", headers=sa).json()
+    assert [r["reference_number"] for r in strategic_rows["data"]] == [strategic]
+    assert client.get(f"{ADM}/enquiries?discussion_type=merger", headers=bdm).json()["data"] == []
+    assert client.get(f"{ADM}/enquiries?discussion_type=unknown", headers=sa).status_code == 422
+    workload = client.get(f"{ADM}/workload", headers=sa).json()["data"]
+    assert workload["totals"]["open_enquiries"] == sum(
+        row["open_enquiries"] for row in workload["rows"]
+    )
+    assert workload["totals"]["open_enquiries"] >= 2
+    assert (
+        client.get(f"{ADM}/workload", headers=bdm).json()["data"]["totals"]["open_enquiries"] == 2
+    )
+    assert client.get(f"{ADM}/enquiries/{ids[proj]}/documents", headers=bdm).status_code == 200
     future = (utcnow() + timedelta(days=1)).isoformat()
     after = client.get(f"{ADM}/enquiries", params={"updated_from": future}, headers=sa).json()
     assert after["data"] == [] and after["meta"]["total"] == 0

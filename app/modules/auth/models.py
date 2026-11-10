@@ -22,6 +22,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     email: Mapped[str] = mapped_column(String(254), unique=True)
     full_name: Mapped[str] = mapped_column(String(150))
+    phone: Mapped[str | None] = mapped_column(String(20))  # E.164, optional
     password_hash: Mapped[str | None] = mapped_column(String(255))  # null until activation
     user_type: Mapped[UserType] = mapped_column(enum_column(UserType, "user_type"))
     staff_role: Mapped[StaffRole | None] = mapped_column(enum_column(StaffRole, "staff_role"))

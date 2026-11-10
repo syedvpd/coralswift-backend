@@ -1,7 +1,18 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    false,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database.base import Base, UUIDPrimaryKeyMixin
@@ -61,3 +72,22 @@ class NotificationTemplate(Base):
     version: Mapped[int] = mapped_column(Integer, default=1)
     updated_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class StaffNotification(UUIDPrimaryKeyMixin, Base):
+    """In-app feed item for one staff member (PRD s.14 notification feed). The title is generic
+    (reference numbers only, never submitter content), so strategic records leak nothing."""
+
+    __tablename__ = "staff_notifications"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    kind: Mapped[str] = mapped_column(String(40))
+    title: Mapped[str] = mapped_column(String(200))
+    record_type: Mapped[str | None] = mapped_column(String(40))
+    record_id: Mapped[uuid.UUID | None]
+    is_strategic: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (Index("ix_staff_notifications_user_created", "user_id", "created_at"),)

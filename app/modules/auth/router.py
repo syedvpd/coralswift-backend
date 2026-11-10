@@ -12,7 +12,7 @@ from app.database.dependencies import DbSession
 from app.modules.auth import service
 from app.modules.auth.constants import StaffRole, UserType
 from app.modules.auth.dependencies import AuthDep, PendingAuthDep
-from app.modules.auth.models import AuthSession
+from app.modules.auth.models import AuthSession, User
 from app.modules.auth.permissions import permissions_for, role_matrix
 from app.modules.auth.schemas import (
     AcceptInvitationIn,
@@ -20,11 +20,13 @@ from app.modules.auth.schemas import (
     LoginIn,
     MeOut,
     MfaCodeIn,
+    MfaDisableIn,
     MfaEnrollOut,
     MfaVerifyIn,
     OrganizationRef,
     PasswordResetConfirmIn,
     PasswordResetRequestIn,
+    ProfileUpdateIn,
     RecoveryCodesOut,
     RefreshIn,
     SessionOut,
@@ -187,24 +189,63 @@ def my_permissions(auth: AuthDep, request: Request) -> ApiResponse[dict[str, Any
     return ok(data)
 
 
-@router.get("/me", response_model=ApiResponse[MeOut], responses=_ERR, summary="Current account")
-def me(auth: PendingAuthDep, db: DbSession) -> ApiResponse[MeOut]:
-    user = auth.user
+def _me_out(db: DbSession, settings: Settings, user: User) -> MeOut:
     org_ref = None
+    partner_role = None
     if user.user_type is UserType.PARTNER:
         membership = service.active_membership(db, user.id)
         org = db.get(PartnerOrganization, membership.organization_id) if membership else None
         org_ref = OrganizationRef(id=org.id, legal_name=org.legal_name) if org else None
-    return ok(
-        MeOut(
-            id=user.id,
-            email=user.email,
-            full_name=user.full_name,
-            user_type=user.user_type,
-            staff_role=user.staff_role,
-            organization=org_ref,
-        )
+        partner_role = membership.role.value if membership else None
+    return MeOut(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        phone=user.phone,
+        user_type=user.user_type,
+        account_status=user.status,
+        staff_role=user.staff_role,
+        partner_role=partner_role,
+        organization=org_ref,
+        mfa_enabled=user.mfa_enabled_at is not None,
+        mfa_required=user.user_type is UserType.STAFF and settings.staff_mfa_required,
+        last_login_at=user.last_login_at,
     )
+
+
+@router.get("/me", response_model=ApiResponse[MeOut], responses=_ERR, summary="Current account")
+def me(auth: PendingAuthDep, db: DbSession, settings: SettingsDep) -> ApiResponse[MeOut]:
+    return ok(_me_out(db, settings, auth.user))
+
+
+@router.patch(
+    "/me",
+    response_model=ApiResponse[MeOut],
+    responses={**_ERR, 422: {"model": ErrorResponse}},
+    summary="Update your own name and phone (staff and partners); audited",
+)
+def update_my_profile(
+    payload: ProfileUpdateIn, auth: AuthDep, db: DbSession, settings: SettingsDep
+) -> ApiResponse[MeOut]:
+    user = service.update_profile(
+        db, auth.user.id, {k: getattr(payload, k) for k in payload.model_fields_set}
+    )
+    return ok(_me_out(db, settings, user), "Profile updated")
+
+
+@router.post(
+    "/mfa/disable",
+    response_model=ApiResponse[None],
+    dependencies=AUTH_LIMIT,
+    responses={**_ERR, 400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+    summary="Turn MFA off (partner accounts only; password and a current code required)",
+)
+def mfa_disable(
+    payload: MfaDisableIn, auth: AuthDep, db: DbSession, settings: SettingsDep
+) -> ApiResponse[None]:
+    service.disable_mfa(db, settings, auth.user, payload.password, payload.code)
+    service.revoke_other_sessions(db, auth.user, auth.session)
+    return ok(None, "MFA disabled")
 
 
 @router.get("/sessions", response_model=ApiResponse[list[SessionOut]], responses=_ERR)
@@ -222,10 +263,21 @@ def list_sessions(auth: AuthDep, db: DbSession) -> ApiResponse[list[SessionOut]]
                 last_used_at=s.last_used_at,
                 user_agent=s.user_agent,
                 current=s.id == auth.session.id,
+                expires_at=s.refresh_expires_at,
             )
             for s in rows
         ]
     )
+
+
+@router.delete(
+    "/sessions",
+    response_model=ApiResponse[dict[str, int]],
+    responses=_ERR,
+    summary="Sign out every other session of your account",
+)
+def revoke_other_sessions(auth: AuthDep, db: DbSession) -> ApiResponse[dict[str, int]]:
+    return ok({"revoked": service.revoke_other_sessions(db, auth.user, auth.session)})
 
 
 @router.delete(

@@ -118,6 +118,14 @@ class PrivacyRequestOut(BaseModel):
     status: PrivacyRequestStatus
     resolution_note: str | None
     created_at: datetime
+    email_verified: bool = False
+    submitted_by_partner: bool = False
+
+
+class PrivacyVerifyIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=10, max_length=200)
 
 
 class PrivacyUpdateIn(BaseModel):
@@ -125,3 +133,21 @@ class PrivacyUpdateIn(BaseModel):
 
     status: PrivacyRequestStatus
     resolution_note: Long | None = None
+
+
+class PartnerPrivacyRequestIn(BaseModel):
+    """Identity (email, account) comes from the session; the body only says what is wanted."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: PrivacyRequestKind
+    details: str | None = Field(default=None, max_length=2000)
+
+
+class PartnerPrivacyRequestOut(BaseModel):
+    reference: str
+    kind: PrivacyRequestKind
+    status: PrivacyRequestStatus
+    details: str | None
+    resolution_note: str | None  # only once the request is completed or rejected
+    created_at: datetime

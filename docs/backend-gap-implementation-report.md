@@ -1,6 +1,6 @@
 # Backend Gap Implementation Report (2026-11-10)
 
-Scope: the register in `backend-gap-audit.md`. All changes are additive; migration `0011` adds nullable columns only. Nothing was deployed, no migration was applied to Supabase, no secret was committed. Changes are **uncommitted** in the working tree.
+Scope: the register in `backend-gap-audit.md`. The counts immediately below are the historical baseline at commit `15ebe59`, not the current source-verified status. Nothing was deployed, no migration was applied to Supabase, no secret was committed. Changes are **uncommitted** in the working tree.
 
 ## Status of the whole register
 Rows classified: 188 (mixed-status rows are counted once under their first label).
@@ -26,7 +26,11 @@ The project is therefore **not** complete. Do not read the 253 passing tests as 
 
 Behaviour changes a client must know: a replayed invitation/reset token now returns `TOKEN_ALREADY_USED` (was `INVALID_OR_EXPIRED_TOKEN`); login of a deactivated account with the right password returns 403 `ACCOUNT_DEACTIVATED` (was 401); `GET /admin/notifications` accepts `status=all` and its rows gained fields; the partner notification list gained `id`, `read_at`, `is_read` and `meta.unread`; `GET /admin/users` and `/admin/profile-change-requests` are now paginated.
 
-Migration 0011: applied to the local disposable test database only (`alembic check` clean, head `0011`). **Not applied to Supabase.** Downgrade drops the added columns (data in them is lost); the follow-up `kind` CHECK is dropped first. No existing data is changed.
+At the original report baseline, migration 0011 was applied to disposable local test databases (`alembic check` clean, head `0011`) and not to Supabase. The current uncommitted head is `0012`; 0012 is not applied to any database. See `docs/handoff/SUPABASE_MIGRATION_PLAN.md` for both migration impacts and the no-remote-operation preconditions.
 
 ## Remaining work (NOT CLOSED)
-X3 typed overview, KPIs, org detail, enquiry detail objects (M5); `discussion_type` filter; workload endpoint; staff document review history; enquiry attachment list; staff in-app notification feed; template versioning and placeholder list; media library, SEO, scheduled publication; profile update of staff users; audit get-by-id, catalogue and export; account metrics, trends and extra reports; delivery result on account rows; `/auth/me` account status; partner-visible application fields (decision, due dates, provisioning, `last_updated`); editable-field metadata, revision before/after, null semantics; document-request resource. Items tied to a decision (D1-D27) stay blocked until answered.
+Remaining gaps are listed in the current source-verified audit and progress matrix. SEO metadata is frontend per PRD 1.25/R-071; media library waits on D23. New endpoint work since the initial baseline is summarized below. Decision-blocked status/onboarding and unverified behavior are not considered complete.
+
+## Source-verified follow-up (2026-11-10)
+
+Since the initial report, uncommitted code adds typed overview/KPI/organization/enquiry contracts, account metrics, staff self-name update with audit, account-row invitation delivery status/time, partner document operation hints, template placeholder listing, audit event/detail/action catalogue/CSV, approved-content scheduling with maintenance execution and dry-run reporting (`0012`), and typed aggregate follow-up/document-review/communication reports. Focused regression assertions exist for these changes. Ruff, format, Mypy, OpenAPI generation and offline Alembic SQL/history checks pass; pytest collection passes (257 tests). The latest full suite reported 257 setup errors because Docker cannot connect to its Linux engine and local PostgreSQL at `localhost:5433` refuses the connection; test bodies did not execute. `0011` and `0012` remain unapplied to Supabase; see `docs/handoff/SUPABASE_MIGRATION_PLAN.md`. Do not infer completion of decision-blocked fields or missing test evidence.

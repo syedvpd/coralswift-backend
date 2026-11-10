@@ -1,11 +1,11 @@
 """Public content API (/content) and content-admin API (/admin/content)."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
@@ -40,7 +40,33 @@ Tags = Annotated[
 ]
 
 
-class ContentIn(BaseModel):
+HttpsUrl = Annotated[str, Field(max_length=500, pattern=r"^https://[^\s<>\"']+$")]
+SEO_FIELDS = (
+    "seo_title",
+    "seo_description",
+    "canonical_url",
+    "og_title",
+    "og_description",
+    "og_image_url",
+    "image_url",
+    "image_alt",
+)
+
+
+class SeoFields(BaseModel):
+    """Optional SEO / social / cover-image metadata. URLs must be https; send null to clear."""
+
+    seo_title: Annotated[str, Field(max_length=200)] | None = None
+    seo_description: Annotated[str, Field(max_length=300)] | None = None
+    canonical_url: HttpsUrl | None = None
+    og_title: Annotated[str, Field(max_length=200)] | None = None
+    og_description: Annotated[str, Field(max_length=300)] | None = None
+    og_image_url: HttpsUrl | None = None
+    image_url: HttpsUrl | None = None
+    image_alt: Annotated[str, Field(max_length=200)] | None = None
+
+
+class ContentIn(SeoFields):
     model_config = ConfigDict(extra="forbid")
 
     slug: Slug
@@ -53,7 +79,7 @@ class ContentIn(BaseModel):
     claim_ids: list[uuid.UUID] = Field(default_factory=list, max_length=50)
 
 
-class ContentUpdate(BaseModel):
+class ContentUpdate(SeoFields):
     model_config = ConfigDict(extra="forbid")
 
     title: Short | None = None
@@ -76,6 +102,21 @@ class OptionalNoteIn(BaseModel):
     note: Long | None = None
 
 
+class ScheduleIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    publish_at: datetime
+
+    @field_validator("publish_at")
+    @classmethod
+    def require_future_timezone_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("publish_at must include a timezone")
+        if value <= datetime.now(UTC):
+            raise ValueError("publish_at must be in the future")
+        return value
+
+
 class AttachmentOut(BaseModel):
     filename: str
     content_type: str | None
@@ -83,7 +124,7 @@ class AttachmentOut(BaseModel):
     version_label: str | None
 
 
-class PublicContent(BaseModel):
+class PublicContent(SeoFields):
     slug: str
     content_type: ContentType
     title: str
@@ -109,6 +150,7 @@ class AdminContent(PublicContent):
     review_note: str | None
     current_version: int
     claim_ids: list[str]
+    scheduled_publish_at: datetime | None = None
 
 
 class VersionOut(BaseModel):
@@ -141,6 +183,7 @@ def _pub(i: ContentItem) -> PublicContent:
         published_at=i.published_at,
         last_reviewed_at=i.last_reviewed_at,
         attachment=att,
+        **{k: getattr(i, k) for k in SEO_FIELDS},
     )
 
 
@@ -155,6 +198,7 @@ def _adm(i: ContentItem) -> AdminContent:
         review_note=i.review_note,
         current_version=i.current_version,
         claim_ids=list(i.claim_ids or []),
+        scheduled_publish_at=i.scheduled_publish_at,
     )
 
 
@@ -285,7 +329,11 @@ def update(
                 db,
                 staff,
                 item_id,
-                payload.model_dump(mode="json", exclude_unset=True, exclude_none=True),
+                {
+                    k: v
+                    for k, v in payload.model_dump(mode="json", exclude_unset=True).items()
+                    if v is not None or k in SEO_FIELDS  # null clears an SEO field only
+                },
             )
         )
     )
@@ -353,6 +401,30 @@ def reject(
 )
 def publish(item_id: uuid.UUID, staff: ContentAdminDep, db: DbSession) -> ApiResponse[AdminContent]:
     return ok(_adm(service.publish(db, staff, item_id)))
+
+
+@admin.post(
+    "/{item_id}/schedule",
+    response_model=ApiResponse[AdminContent],
+    responses=_ERR,
+    summary="Schedule approved, claims-cleared content for future publication",
+)
+def schedule_publish(
+    item_id: uuid.UUID, payload: ScheduleIn, staff: ContentAdminDep, db: DbSession
+) -> ApiResponse[AdminContent]:
+    return ok(_adm(service.schedule_publish(db, staff, item_id, payload.publish_at)))
+
+
+@admin.delete(
+    "/{item_id}/schedule",
+    response_model=ApiResponse[AdminContent],
+    responses=_ERR,
+    summary="Cancel a scheduled publication",
+)
+def cancel_scheduled_publish(
+    item_id: uuid.UUID, staff: ContentAdminDep, db: DbSession
+) -> ApiResponse[AdminContent]:
+    return ok(_adm(service.cancel_scheduled_publish(db, staff, item_id)))
 
 
 @admin.post("/{item_id}/unpublish", response_model=ApiResponse[AdminContent], responses=_ERR)

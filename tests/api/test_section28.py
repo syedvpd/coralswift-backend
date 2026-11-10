@@ -20,7 +20,7 @@ from app.modules.notifications.service import dispatch_notifications
 from tests import factories
 from tests.conftest import AppFactory
 from tests.fakes import RecordingEmail
-from tests.helpers import bearer, login, make_staff, staff_headers
+from tests.helpers import bearer, last_token, login, make_staff, staff_headers
 
 ADM = "/api/v1/admin"
 AC = "/api/v1/admin/content"
@@ -221,7 +221,9 @@ def test_catalog_is_illustrative_and_criteria_proposed(client: TestClient) -> No
     assert turnover["applies_to"] == ["direct_project_engagement"]
 
 
-def test_privacy_deletion_execution(client: TestClient, db: Session, settings: Settings) -> None:
+def test_privacy_deletion_execution(
+    client: TestClient, db: Session, settings: Settings, email: RecordingEmail
+) -> None:
     sa = hdr(client, db, settings, StaffRole.SUPER_ADMINISTRATOR)
     client.post(
         "/api/v1/enquiries/contact", json=factories.contact(business_email="forget.me@example.com")
@@ -240,6 +242,10 @@ def test_privacy_deletion_execution(client: TestClient, db: Session, settings: S
     assert (
         client.post(f"{ADM}/privacy-requests/{req['id']}/execute", headers=sa).status_code == 409
     )  # not in progress
+    client.post(
+        "/api/v1/privacy/requests/verify",
+        json={"token": last_token(email, "forget.me@example.com")},
+    )
     client.post(f"{ADM}/privacy-requests/{req['id']}", headers=sa, json={"status": "in_progress"})
     done = client.post(f"{ADM}/privacy-requests/{req['id']}/execute", headers=sa).json()["data"]
     assert done["contacts_anonymised"] == 1 and done["newsletter_rows_removed"] == 1

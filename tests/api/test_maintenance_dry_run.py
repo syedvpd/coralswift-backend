@@ -50,6 +50,7 @@ def test_preview_counts_without_changing_anything(
         "sla_would_escalate",
         "expiry_reminders_would_queue",
         "documents_would_purge",
+        "content_would_publish",
         "notifications_would_dispatch",
     }
     assert _counts(db) == before  # nothing escalated, queued or created

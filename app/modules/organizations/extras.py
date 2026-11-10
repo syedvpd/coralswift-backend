@@ -67,6 +67,8 @@ class ChangeRequestOut(BaseModel):
 
 class AdminChangeRequestOut(ChangeRequestOut):
     organization_id: uuid.UUID
+    organization_name: str | None = None
+    before: dict[str, Any] = {}  # current profile values of the requested fields (pending requests)
 
 
 def _out(r: ProfileChangeRequest) -> ChangeRequestOut:
@@ -134,9 +136,25 @@ def list_requests(ctx: PartnerDep, db: DbSession) -> ApiResponse[list[ChangeRequ
     return ok([_out(r) for r in rows])
 
 
+TITLES = {
+    "application_submitted": "Application submitted",
+    "information_requested": "Additional information requested",
+    "application_status_changed": "Application status changed",
+    "application_decision": "Application decision",
+    "expiry_reminder": "A document is about to expire",
+    "profile_change_decision": "Profile change request reviewed",
+    "privacy_request_ack": "Privacy request received",
+    "partner_response_received": "Your response was received",
+    "partner_invitation": "Account invitation",
+}
+
+
 class PartnerNotificationOut(BaseModel):
     id: uuid.UUID
     template: str  # which message it was; content and links are never returned
+    title: str
+    category: str  # application | account | acknowledgement | other
+    related_reference: str | None  # application / enquiry reference, when the message has one
     delivery_status: str
     created_at: datetime
     read_at: datetime | None
@@ -148,6 +166,23 @@ class PartnerEnquiryOut(BaseModel):
     enquiry_type: str
     status: str
     submitted_at: datetime
+
+
+def _notification_out(n: Notification) -> PartnerNotificationOut:
+    ref = (n.context or {}).get("reference")
+    return PartnerNotificationOut(
+        id=n.id,
+        template=n.template_key.value,
+        title=TITLES.get(n.template_key.value, "Message from Coral Swift"),
+        category=n.notification_type.value
+        if n.notification_type.value in ("application", "account", "acknowledgement")
+        else "other",
+        related_reference=ref if isinstance(ref, str) else None,
+        delivery_status=n.delivery_status.value,
+        created_at=n.created_at,
+        read_at=n.read_at,
+        is_read=n.read_at is not None,
+    )
 
 
 def _mine(ctx: PartnerContext) -> list[Any]:
@@ -181,19 +216,43 @@ def my_notifications(
         .offset(page.offset)
     ).scalars()
     return ok(
-        [
-            PartnerNotificationOut(
-                id=n.id,
-                template=n.template_key.value,
-                delivery_status=n.delivery_status.value,
-                created_at=n.created_at,
-                read_at=n.read_at,
-                is_read=n.read_at is not None,
-            )
-            for n in rows
-        ],
+        [_notification_out(n) for n in rows],
         meta={**page_meta(page, total), "unread": unread_count},
     )
+
+
+@partner.get(
+    "/notifications/unread-count",
+    response_model=ApiResponse[dict[str, int]],
+    responses=_ERR,
+    summary="Number of unread messages",
+)
+def unread_count(ctx: PartnerDep, db: DbSession) -> ApiResponse[dict[str, int]]:
+    n = db.execute(
+        select(func.count())
+        .select_from(Notification)
+        .where(*_mine(ctx), Notification.read_at.is_(None))
+    ).scalar_one()
+    return ok({"unread": n})
+
+
+@partner.post(
+    "/notifications/{notification_id}/unread",
+    response_model=ApiResponse[PartnerNotificationOut],
+    responses=_ERR,
+    summary="Mark one message as unread again",
+)
+def mark_unread(
+    notification_id: uuid.UUID, ctx: PartnerDep, db: DbSession
+) -> ApiResponse[PartnerNotificationOut]:
+    n = db.execute(
+        select(Notification).where(Notification.id == notification_id, *_mine(ctx))
+    ).scalar_one_or_none()
+    if n is None:
+        raise NotFoundError("Notification not found")
+    n.read_at = None
+    db.commit()
+    return ok(_notification_out(n))
 
 
 @partner.post(
@@ -229,16 +288,7 @@ def read_one(
     if n.read_at is None:
         n.read_at = utcnow()
         db.commit()
-    return ok(
-        PartnerNotificationOut(
-            id=n.id,
-            template=n.template_key.value,
-            delivery_status=n.delivery_status.value,
-            created_at=n.created_at,
-            read_at=n.read_at,
-            is_read=True,
-        )
-    )
+    return ok(_notification_out(n))
 
 
 @partner.get(
@@ -341,10 +391,29 @@ def admin_list(
         .limit(page.page_size)
         .offset(page.offset)
     ).scalars()
+    listed = list(rows)
+    orgs = {
+        o.id: o
+        for o in db.execute(
+            select(PartnerOrganization).where(
+                PartnerOrganization.id.in_({r.organization_id for r in listed})
+            )
+        ).scalars()
+    }
     return ok(
         [
-            AdminChangeRequestOut(**_out(r).model_dump(), organization_id=r.organization_id)
-            for r in rows
+            AdminChangeRequestOut(
+                **_out(r).model_dump(),
+                organization_id=r.organization_id,
+                organization_name=orgs[r.organization_id].legal_name,
+                before={
+                    f: service._jsonable(getattr(orgs[r.organization_id], f, None))
+                    for f in r.changes
+                }
+                if r.status == "pending"
+                else {},
+            )
+            for r in listed
         ],
         meta=page_meta(page, total),
     )

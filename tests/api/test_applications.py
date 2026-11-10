@@ -66,6 +66,7 @@ def test_submit_snapshot_history_and_notifications(
     app_id = submitted_application(client, p)
     got = client.get(f"{A}/{app_id}", headers=p.headers).json()["data"]
     assert got["status"] == "submitted" and got["submission_count"] == 1 and got["submitted_at"]
+    assert got["last_updated"] and "decided_at" in got
     snap = db.execute(select(ApplicationSubmission)).scalar_one()
     assert snap.submission_no == 1 and len(snap.snapshot["documents"]) == 7
     assert snap.snapshot["profile"]["registration_number"] == "U72200TG2015PTC123456"

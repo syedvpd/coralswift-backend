@@ -27,6 +27,8 @@ from app.modules.auth.models import AuthToken, User
 from app.modules.enquiries.activity import log_activity
 from app.modules.enquiries.constants import ActorType
 from app.modules.enquiries.models import Activity
+from app.modules.notifications.constants import DeliveryStatus, TemplateKey
+from app.modules.notifications.models import Notification
 from app.modules.notifications.service import dispatch_notifications
 from app.modules.organizations.constants import MembershipStatus
 from app.modules.organizations.models import PartnerMembership, PartnerOrganization
@@ -101,6 +103,8 @@ class AccountOut(BaseModel):
     last_login_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    invitation_delivery_status: DeliveryStatus | None = None
+    invitation_delivery_at: datetime | None = None
     organization: OrgRefOut | None = None
 
 
@@ -112,6 +116,15 @@ class AccountEvent(BaseModel):
 
 class AccountDetail(AccountOut):
     recent_activity: list[AccountEvent]
+
+
+class AccountMetricsOut(BaseModel):
+    total_accounts: int
+    accounts_by_type: dict[str, int]
+    accounts_by_status: dict[str, int]
+    staff_by_role: dict[str, int]
+    active_partner_accounts: int
+    accounts_never_logged_in: int
 
 
 def _valid_invite(now: datetime) -> ColumnElement[bool]:
@@ -132,6 +145,18 @@ def _any_invite(*conditions: ColumnElement[bool]) -> ColumnElement[bool]:
 
 def _account_rows(db: Session, users: list[User]) -> list[AccountOut]:
     orgs: dict[uuid.UUID, OrgRefOut] = {}
+    invite_delivery: dict[str, tuple[DeliveryStatus, datetime]] = {}
+    emails = [u.email for u in users]
+    if emails:
+        for recipient, status, created_at in db.execute(
+            select(Notification.recipient, Notification.delivery_status, Notification.created_at)
+            .where(
+                Notification.recipient.in_(emails),
+                Notification.template_key == TemplateKey.PARTNER_INVITATION,
+            )
+            .order_by(Notification.created_at.desc(), Notification.id.desc())
+        ):
+            invite_delivery.setdefault(recipient, (status, created_at))
     partner_ids = [u.id for u in users if u.user_type is UserType.PARTNER]
     if partner_ids:
         for uid, oid, name in db.execute(
@@ -158,6 +183,12 @@ def _account_rows(db: Session, users: list[User]) -> list[AccountOut]:
             last_login_at=u.last_login_at,
             created_at=u.created_at,
             updated_at=u.updated_at,
+            invitation_delivery_status=(
+                invite_delivery[u.email][0] if u.email in invite_delivery else None
+            ),
+            invitation_delivery_at=(
+                invite_delivery[u.email][1] if u.email in invite_delivery else None
+            ),
             organization=orgs.get(u.id),
         )
         for u in users
@@ -237,6 +268,48 @@ def list_accounts(
         db.execute(stmt.order_by(*_SORTS[sort]).limit(page.page_size).offset(page.offset)).scalars()
     )
     return ok(_account_rows(db, users), meta=page_meta(page, total))
+
+
+@router.get(
+    "/accounts/metrics",
+    response_model=ApiResponse[AccountMetricsOut],
+    responses=_ERR,
+    summary="Account counts by type, status and staff role (super administrator)",
+)
+def account_metrics(staff: SuperAdminDep, db: DbSession) -> ApiResponse[AccountMetricsOut]:
+    by_type = {
+        str(kind.value): count
+        for kind, count in db.execute(select(User.user_type, func.count()).group_by(User.user_type))
+    }
+    by_status = {
+        str(status.value): count
+        for status, count in db.execute(select(User.status, func.count()).group_by(User.status))
+    }
+    by_role = {
+        str(role.value): count
+        for role, count in db.execute(
+            select(User.staff_role, func.count())
+            .where(User.user_type == UserType.STAFF, User.staff_role.is_not(None))
+            .group_by(User.staff_role)
+        )
+        if role is not None
+    }
+    return ok(
+        AccountMetricsOut(
+            total_accounts=sum(by_type.values()),
+            accounts_by_type=by_type,
+            accounts_by_status=by_status,
+            staff_by_role=by_role,
+            active_partner_accounts=db.execute(
+                select(func.count())
+                .select_from(User)
+                .where(User.user_type == UserType.PARTNER, User.status == UserStatus.ACTIVE)
+            ).scalar_one(),
+            accounts_never_logged_in=db.execute(
+                select(func.count()).select_from(User).where(User.last_login_at.is_(None))
+            ).scalar_one(),
+        )
+    )
 
 
 def _account(db: Session, user_id: uuid.UUID) -> User:

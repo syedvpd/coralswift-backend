@@ -89,6 +89,21 @@ class PrivacyRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     resolution_note: Mapped[str | None] = mapped_column(Text)
     executed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Public requests prove control of the address by email link; partner requests are signed in.
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    verification_token_hash: Mapped[str | None] = mapped_column(String(64), index=True)
+    verification_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    submitted_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), index=True
+    )
+
+    @property
+    def email_verified(self) -> bool:
+        return self.email_verified_at is not None
+
+    @property
+    def submitted_by_partner(self) -> bool:
+        return self.submitted_by_user_id is not None
 
 
 class NewsletterSubscription(UUIDPrimaryKeyMixin, TimestampMixin, Base):

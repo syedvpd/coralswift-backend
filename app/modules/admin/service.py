@@ -9,17 +9,19 @@ Partner Reviewer keeps the Phase 2 reviewer API only.
 
 import csv
 import io
+import json
 import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Select, exists, func, or_, select
+from sqlalchemy import Select, case, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.common.utilities import utcnow
 from app.core.exceptions import AppError, NotFoundError
 from app.integrations.storage import Storage, StorageError
 from app.modules.admin import lookups
+from app.modules.admin.feed import notify_staff
 from app.modules.admin.models import EnquiryFollowUp
 from app.modules.applications.constants import TERMINAL, PortalStatus
 from app.modules.applications.models import PortalApplication
@@ -27,6 +29,7 @@ from app.modules.auth import service as auth_service
 from app.modules.auth.constants import StaffRole, UserStatus, UserType
 from app.modules.auth.dependencies import StaffContext
 from app.modules.auth.models import User
+from app.modules.documents.constants import EvidenceCategory, OwnerType
 from app.modules.documents.models import Document
 from app.modules.engagement.models import MeetingRequest
 from app.modules.enquiries.activity import log_activity
@@ -38,6 +41,7 @@ from app.modules.organizations.models import PartnerOrganization
 from app.modules.partners.models import PartnerApplication
 from app.modules.projects.constants import ProjectCategory, category_group
 from app.modules.projects.models import ProjectEnquiry
+from app.modules.strategic.constants import DiscussionType
 from app.modules.strategic.models import StrategicEnquiry
 
 BDM_TYPES = {EnquiryType.GENERAL, EnquiryType.PROJECT, EnquiryType.PARTNER, EnquiryType.MEETING}
@@ -102,6 +106,7 @@ def apply_filters(
     created_to: datetime | None = None,
     assigned_any: bool = False,
     category: ProjectCategory | None = None,
+    discussion_type: DiscussionType | None = None,
     project_group: str | None = None,
     updated_from: datetime | None = None,
     updated_to: datetime | None = None,
@@ -113,6 +118,13 @@ def apply_filters(
             exists().where(
                 ProjectEnquiry.enquiry_id == Enquiry.id,
                 ProjectEnquiry.project_category == category,
+            )
+        )
+    if discussion_type:
+        stmt = stmt.where(
+            exists().where(
+                StrategicEnquiry.enquiry_id == Enquiry.id,
+                StrategicEnquiry.discussion_type == discussion_type,
             )
         )
     if project_group:
@@ -230,6 +242,46 @@ def list_enquiries(
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
     rows = db.execute(stmt.order_by(*ENQUIRY_SORTS[sort]).limit(limit).offset(offset)).all()
     return enrich_rows(db, [row_dict(*r) for r in rows]), total
+
+
+def enquiry_workload(db: Session, staff: StaffContext) -> dict[str, Any]:
+    """Count open enquiry work by assignee without applying capacity or assignment rules."""
+    now = utcnow()
+    open_condition = Enquiry.status != EnquiryStatus.CLOSED
+    overdue_condition = open_condition & (Enquiry.next_follow_up_at < now)
+    sla_condition = (
+        open_condition & (Enquiry.response_due_at < now) & Enquiry.first_response_at.is_(None)
+    )
+    rows = db.execute(
+        select(
+            Enquiry.assigned_user_id,
+            func.count().label("open_enquiries"),
+            func.count(case((overdue_condition, 1))).label("overdue_follow_ups"),
+            func.count(case((sla_condition, 1))).label("sla_breached"),
+        )
+        .where(Enquiry.enquiry_type.in_(visible_types(staff)), open_condition)
+        .group_by(Enquiry.assigned_user_id)
+        .order_by(Enquiry.assigned_user_id)
+    ).all()
+    names = lookups.user_names(db, (row.assigned_user_id for row in rows if row.assigned_user_id))
+    result = [
+        {
+            "assignee_id": row.assigned_user_id,
+            "assignee_name": names.get(row.assigned_user_id) if row.assigned_user_id else None,
+            "open_enquiries": row.open_enquiries,
+            "overdue_follow_ups": row.overdue_follow_ups,
+            "sla_breached": row.sla_breached,
+        }
+        for row in rows
+    ]
+    return {
+        "rows": result,
+        "totals": {
+            "open_enquiries": sum(row["open_enquiries"] for row in result),
+            "overdue_follow_ups": sum(row["overdue_follow_ups"] for row in result),
+            "sla_breached": sum(row["sla_breached"] for row in result),
+        },
+    }
 
 
 def get_visible(
@@ -358,6 +410,36 @@ def enquiry_detail(db: Session, staff: StaffContext, enquiry_id: uuid.UUID) -> d
     }
 
 
+def list_enquiry_documents(
+    db: Session, staff: StaffContext, enquiry_id: uuid.UUID, limit: int, offset: int
+) -> tuple[list[dict[str, Any]], int]:
+    get_visible(db, staff, enquiry_id)
+    stmt = select(Document).where(
+        Document.owner_type == OwnerType.ENQUIRY, Document.owner_id == enquiry_id
+    )
+    if not _is_super(staff):
+        stmt = stmt.where(Document.category != EvidenceCategory.FINANCIAL_STATEMENTS)
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    page = db.execute(
+        stmt.order_by(Document.uploaded_at, Document.id).limit(limit).offset(offset)
+    ).scalars()
+    return (
+        [
+            {
+                "id": d.id,
+                "original_filename": d.original_filename,
+                "content_type": d.content_type,
+                "file_size": d.file_size,
+                "category": d.category.value if d.category else None,
+                "classification": d.classification.value,
+                "upload_status": d.upload_status.value,
+            }
+            for d in page
+        ],
+        total,
+    )
+
+
 def mark_response(e: Enquiry) -> None:
     """First staff response stops the SLA clock (a status change or a follow-up note counts)."""
     if e.first_response_at is None:
@@ -404,6 +486,16 @@ def assign_enquiry(
     _check_owner(db, e, user_id)
     previous = e.assigned_user_id
     e.assigned_user_id = user_id
+    if user_id is not None and user_id != previous and user_id != staff.user.id:
+        notify_staff(
+            db,
+            user_id,
+            "enquiry_assigned",
+            f"Enquiry {e.reference_number} was assigned to you",
+            record_type="enquiry",
+            record_id=e.id,
+            is_strategic=e.enquiry_type is EnquiryType.STRATEGIC,
+        )
     _audit(
         db,
         staff,
@@ -466,6 +558,7 @@ def add_followup(
     )
     db.add(f)
     db.flush()
+    _tell_assignee(db, staff, e, f)
     if kind != "note":  # an internal note is not a response to the requester
         mark_response(e)
     _recompute_next(db, e)
@@ -479,6 +572,19 @@ def add_followup(
     )
     db.commit()
     return f
+
+
+def _tell_assignee(db: Session, staff: StaffContext, e: Enquiry, f: EnquiryFollowUp) -> None:
+    if f.assignee_id is not None and f.assignee_id != staff.user.id:
+        notify_staff(
+            db,
+            f.assignee_id,
+            "followup_assigned",
+            f"A follow-up on {e.reference_number} was assigned to you",
+            record_type="enquiry",
+            record_id=e.id,
+            is_strategic=e.enquiry_type is EnquiryType.STRATEGIC,
+        )
 
 
 def _open_followup(db: Session, e: Enquiry, followup_id: uuid.UUID) -> EnquiryFollowUp:
@@ -513,9 +619,12 @@ def update_followup(
         changes.pop("note", None)  # the note cannot be cleared
     if "assignee_id" in changes:
         _check_owner(db, e, changes["assignee_id"])
+    previous_assignee = f.assignee_id
     for name, value in changes.items():
         setattr(f, name, value)
     db.flush()
+    if f.assignee_id != previous_assignee:
+        _tell_assignee(db, staff, e, f)
     _recompute_next(db, e)
     _audit(
         db,
@@ -1193,5 +1302,70 @@ def applications_csv(
             ]
         )
     _audit(db, staff, "report", uuid.uuid4(), "admin.report_exported", {"report": "applications"})
+    db.commit()
+    return buf.getvalue()
+
+
+def audit_csv(
+    db: Session,
+    staff: StaffContext,
+    *,
+    record_type: str | None,
+    action: str | None,
+    actor_user_id: uuid.UUID | None,
+    organization_id: uuid.UUID | None,
+    created_from: datetime | None,
+    created_to: datetime | None,
+    q: str | None,
+    ascending: bool,
+) -> str:
+    rows, _total = list_audit(
+        db,
+        MAX_EXPORT_ROWS,
+        0,
+        record_type=record_type,
+        action=action,
+        actor_user_id=actor_user_id,
+        organization_id=organization_id,
+        created_from=created_from,
+        created_to=created_to,
+        q=q,
+        ascending=ascending,
+    )
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        [
+            "id",
+            "record_type",
+            "record_id",
+            "action",
+            "actor_type",
+            "actor_user_id",
+            "organization_id",
+            "request_id",
+            "metadata",
+            "created_at",
+        ]
+    )
+    for row in rows:
+        writer.writerow(
+            [
+                _safe(value)
+                for value in [
+                    row.id,
+                    row.record_type,
+                    row.record_id,
+                    row.action,
+                    row.actor_type.value,
+                    row.actor_user_id or "",
+                    row.organization_id or "",
+                    row.request_id or "",
+                    json.dumps(row.meta, sort_keys=True),
+                    row.created_at,
+                ]
+            ]
+        )
+    _audit(db, staff, "report", uuid.uuid4(), "admin.report_exported", {"report": "audit"})
     db.commit()
     return buf.getvalue()

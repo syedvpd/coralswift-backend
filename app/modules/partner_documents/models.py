@@ -74,3 +74,30 @@ class PartnerDocumentVersion(UUIDPrimaryKeyMixin, Base):
         CheckConstraint("file_size > 0", name="positive_size"),
         CheckConstraint("length(checksum) = 64", name="sha256_length"),
     )
+
+
+class DocumentRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Staff ask a partner organisation for a document, with a deadline (PRD s.13 additional
+    document requests). Uploading a document against the request fulfils it."""
+
+    __tablename__ = "document_requests"
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("partner_organizations.id", ondelete="RESTRICT"), index=True
+    )
+    application_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("portal_applications.id", ondelete="RESTRICT"), index=True
+    )
+    category: Mapped[str] = mapped_column(String(40))
+    note: Mapped[str] = mapped_column(Text)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(20), default="open", server_default="open")
+    fulfilled_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("partner_documents.id", ondelete="RESTRICT")
+    )
+    fulfilled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+
+    __table_args__ = (
+        CheckConstraint("status IN ('open', 'fulfilled', 'cancelled')", name="status_valid"),
+    )

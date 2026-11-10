@@ -7,7 +7,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -82,6 +82,64 @@ def _audit(db: Session, user: User, action: str, meta: dict[str, object] | None 
         actor_user_id=user.id,
         organization_id=membership.organization_id if membership else None,
     )
+
+
+def update_profile(db: Session, user_id: uuid.UUID, changes: dict[str, str | None]) -> User:
+    """Own display name / phone for staff and partners. Audited by field name only."""
+    user = db.execute(select(User).where(User.id == user_id).with_for_update()).scalar_one()
+    changed = sorted(k for k, v in changes.items() if getattr(user, k) != v)
+    for k in changed:
+        setattr(user, k, changes[k])
+    if changed:
+        _audit(db, user, "auth.profile_updated", {"fields": changed})
+        db.commit()
+    return user
+
+
+def disable_mfa(db: Session, settings: Settings, user: User, password: str, code: str) -> None:
+    """Partner accounts only (staff MFA is mandatory policy). Needs the password and a live code;
+    every other session is signed out afterwards."""
+    locked = db.execute(select(User).where(User.id == user.id).with_for_update()).scalar_one()
+    if locked.user_type is not UserType.PARTNER:
+        raise AppError(
+            "Staff MFA cannot be disabled", status_code=403, code="MFA_REQUIRED_FOR_STAFF"
+        )
+    if locked.mfa_enabled_at is None or locked.mfa_secret_enc is None:
+        raise AppError("MFA is not enabled", status_code=409, code="MFA_NOT_ENABLED")
+    if locked.password_hash is None or not verify_password(
+        settings, locked.password_hash, password
+    ):
+        _audit(db, locked, "auth.mfa_disable_failed")
+        db.commit()
+        raise AppError(
+            "Current password is incorrect", status_code=400, code="INVALID_CURRENT_PASSWORD"
+        )
+    secret = mfa.decrypt_secret(settings, locked.mfa_secret_enc)
+    if not secret or mfa.verify_code(secret, code, locked.mfa_last_step) is None:
+        _audit(db, locked, "auth.mfa_disable_failed")
+        db.commit()
+        raise AppError("Invalid verification code", status_code=401, code="INVALID_MFA_CODE")
+    locked.mfa_secret_enc = None
+    locked.mfa_enabled_at = None
+    locked.mfa_last_step = None
+    db.execute(delete(MfaRecoveryCode).where(MfaRecoveryCode.user_id == locked.id))
+    _audit(db, locked, "auth.mfa_disabled")
+    db.commit()
+
+
+def revoke_other_sessions(db: Session, user: User, current: AuthSession) -> int:
+    result = db.execute(
+        update(AuthSession)
+        .where(
+            AuthSession.user_id == user.id,
+            AuthSession.id != current.id,
+            AuthSession.revoked_at.is_(None),
+        )
+        .values(revoked_at=utcnow(), revoked_reason="signed_out_others")
+    )
+    _audit(db, user, "auth.other_sessions_revoked")
+    db.commit()
+    return int(getattr(result, "rowcount", 0))
 
 
 # ---------------------------------------------------------------- sessions

@@ -62,6 +62,9 @@ def test_upload_metadata_private_storage(
     r = up(client, p, expires_on="2030-01-31")
     assert r.status_code == 201
     cv = r.json()["data"]["current_version"]
+    assert r.json()["data"]["can_replace"] is True
+    assert r.json()["data"]["can_remove"] is True
+    assert r.json()["data"]["can_download"] is True
     assert cv["checksum_sha256"] == hashlib.sha256(factories.PDF).hexdigest()
     assert cv["upload_status"] == "quarantined" and cv["review_status"] == "pending"
     assert cv["expires_on"] == "2030-01-31" and "storage_key" not in r.text

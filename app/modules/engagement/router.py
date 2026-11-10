@@ -7,7 +7,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
@@ -16,16 +16,23 @@ from app.core.protection import SubmissionGuards, rate_limit, require_human
 from app.database.dependencies import DbSession
 from app.modules.admin import service as admin_service
 from app.modules.auth.constants import StaffRole
-from app.modules.auth.dependencies import StaffContext, SuperAdminDep, require_staff
+from app.modules.auth.dependencies import PartnerDep, StaffContext, SuperAdminDep, require_staff
 from app.modules.engagement import service
-from app.modules.engagement.models import NewsletterSubscription, PrivacyRequestStatus
+from app.modules.engagement.models import (
+    NewsletterSubscription,
+    PrivacyRequest,
+    PrivacyRequestStatus,
+)
 from app.modules.engagement.schemas import (
     MeetingConfirmIn,
     MeetingRequestIn,
     NewsletterIn,
+    PartnerPrivacyRequestIn,
+    PartnerPrivacyRequestOut,
     PrivacyRequestIn,
     PrivacyRequestOut,
     PrivacyUpdateIn,
+    PrivacyVerifyIn,
     ReasonIn,
     UnsubscribeIn,
 )
@@ -136,6 +143,75 @@ def privacy_request(
     row = service.create_privacy_request(db, settings, payload.email, payload.kind, payload.details)
     _dispatch(request, settings, background)
     return ok({"reference": row.reference}, "Request received")
+
+
+@public.post(
+    "/privacy/requests/verify",
+    response_model=ApiResponse[dict[str, str]],
+    dependencies=[Depends(rate_limit("submit"))],
+    responses=_ERR,
+    summary="Confirm the email address of a privacy request (link from the email, single use)",
+)
+def privacy_verify(payload: PrivacyVerifyIn, db: DbSession) -> ApiResponse[dict[str, str]]:
+    row = service.verify_privacy_email(db, payload.token)
+    return ok({"reference": row.reference}, "Email confirmed")
+
+
+partner = APIRouter(prefix="/partner/privacy-requests", tags=["partner-privacy"])
+
+
+def _partner_privacy_out(r: PrivacyRequest) -> PartnerPrivacyRequestOut:
+    closed = r.status in (PrivacyRequestStatus.COMPLETED, PrivacyRequestStatus.REJECTED)
+    return PartnerPrivacyRequestOut(
+        reference=r.reference,
+        kind=r.kind,
+        status=r.status,
+        details=r.details,
+        resolution_note=r.resolution_note if closed else None,
+        created_at=r.created_at,
+    )
+
+
+@partner.post(
+    "",
+    status_code=201,
+    response_model=ApiResponse[PartnerPrivacyRequestOut],
+    dependencies=[Depends(rate_limit("submit"))],
+    responses=_ERR,
+    summary="Submit a data access / correction / deletion request as the signed-in partner",
+)
+def partner_privacy_request(
+    payload: PartnerPrivacyRequestIn,
+    request: Request,
+    ctx: PartnerDep,
+    db: DbSession,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+) -> ApiResponse[PartnerPrivacyRequestOut]:
+    row = service.create_privacy_request(
+        db, settings, ctx.user.email, payload.kind, payload.details, submitted_by=ctx.user.id
+    )
+    _dispatch(request, settings, background)
+    return ok(_partner_privacy_out(row), "Request received")
+
+
+@partner.get(
+    "",
+    response_model=ApiResponse[list[PartnerPrivacyRequestOut]],
+    responses=_ERR,
+    summary="Your own privacy requests",
+)
+def my_privacy_requests(
+    ctx: PartnerDep, db: DbSession, page: PageDep
+) -> ApiResponse[list[PartnerPrivacyRequestOut]]:
+    stmt = select(PrivacyRequest).where(PrivacyRequest.submitted_by_user_id == ctx.user.id)
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    rows = db.execute(
+        stmt.order_by(PrivacyRequest.created_at.desc(), PrivacyRequest.id.desc())
+        .limit(page.page_size)
+        .offset(page.offset)
+    ).scalars()
+    return ok([_partner_privacy_out(r) for r in rows], meta=page_meta(page, total))
 
 
 # ------------------------------------------------------------------- admin

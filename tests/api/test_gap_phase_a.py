@@ -151,6 +151,15 @@ def test_audit_rows_have_actor_names_strategic_flag_search_and_sort(
     sid = client.get(f"{ADM}/enquiries?type=strategic", headers=h).json()["data"][0]["id"]
     client.patch(f"{ADM}/enquiries/{sid}", headers=h, json={"priority": "high"})
     rows = client.get(f"{ADM}/audit?page_size=100", headers=h).json()["data"]
+    actions = client.get(f"{ADM}/audit/actions", headers=h)
+    assert actions.status_code == 200 and "auth.login" in actions.json()["data"]
+    audit_id = rows[0]["id"]
+    detail = client.get(f"{ADM}/audit/{audit_id}", headers=h)
+    assert detail.status_code == 200 and detail.json()["data"]["id"] == audit_id
+    assert (
+        client.get(f"{ADM}/audit/00000000-0000-0000-0000-000000000000", headers=h).status_code
+        == 404
+    )
     mine = [r for r in rows if r["actor_user_id"] == str(admin.id)]
     assert mine and all(r["actor_name"] == "Staff Member" for r in mine)
     enquiry_rows = [r for r in rows if r["record_type"] == "enquiry"]
@@ -162,6 +171,12 @@ def test_audit_rows_have_actor_names_strategic_flag_search_and_sort(
     desc = client.get(f"{ADM}/audit?sort=-created_at&page_size=100", headers=h).json()["data"]
     assert [r["id"] for r in asc] == [r["id"] for r in reversed(desc)]
     assert client.get(f"{ADM}/audit?sort=bogus", headers=h).status_code == 422
+    exported = client.get(f"{ADM}/audit.csv?q=login", headers=h)
+    assert exported.status_code == 200 and exported.headers["content-type"].startswith("text/csv")
+    assert "auth.login" in exported.text
+    bdm_user = _staff(db, settings, StaffRole.BUSINESS_DEVELOPMENT_MANAGER)
+    bdm_h = bearer(login(client, bdm_user.email)["access_token"])
+    assert client.get(f"{ADM}/audit.csv", headers=bdm_h).status_code == 403
 
 
 def test_outbox_rows_are_typed_filterable_and_flag_strategic(

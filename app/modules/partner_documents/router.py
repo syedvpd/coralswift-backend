@@ -10,7 +10,7 @@ from app.core.protection import rate_limit
 from app.database.dependencies import DbSession
 from app.modules.auth.dependencies import PartnerDep
 from app.modules.enquiries.constants import ActorType
-from app.modules.partner_documents import service
+from app.modules.partner_documents import requests, service
 from app.modules.partner_documents.constants import PartnerDocCategory
 from app.modules.partner_documents.schemas import (
     DocumentOut,
@@ -49,7 +49,13 @@ def upload(
     file: FileField,
     category: Annotated[PartnerDocCategory, Form()],
     expires_on: ExpiresField = None,
+    request_id: Annotated[
+        uuid.UUID | None, Form(description="Fulfils this document request")
+    ] = None,
 ) -> ApiResponse[DocumentOut]:
+    pending = (
+        requests.open_request_for_upload(db, ctx, request_id, category) if request_id else None
+    )
     doc, version = service.upload_new(
         db,
         request.app.state.storage,
@@ -59,6 +65,8 @@ def upload(
         category=category,
         expires_on=expires_on,
     )
+    if pending is not None:
+        requests.mark_fulfilled(db, pending, doc.id, ctx.user.id)
     return ok(document_out(doc, version), "Document uploaded")
 
 

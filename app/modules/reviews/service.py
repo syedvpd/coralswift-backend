@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.common.utilities import utcnow
 from app.core.exceptions import AppError, NotFoundError
+from app.modules.admin.feed import notify_staff
 from app.modules.applications.constants import PortalStatus
 from app.modules.applications.models import (
     EligibilityVerification,
@@ -74,6 +75,15 @@ def assign(
     previous = app.assigned_reviewer_id
     app.assigned_reviewer_id = reviewer.id
     if previous != reviewer.id:  # PRD s.13/s.14: notify the reviewer of a new assignment
+        if reviewer.id != staff.user.id:
+            notify_staff(
+                db,
+                reviewer.id,
+                "application_assigned",
+                f"Application {app.reference} was assigned to you",
+                record_type="portal_application",
+                record_id=app.id,
+            )
         queue_notification(
             db,
             recipient=reviewer.email,

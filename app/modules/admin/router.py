@@ -6,25 +6,31 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
+from sqlalchemy import select
 
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
 from app.core.config import Settings, get_settings
+from app.core.exceptions import NotFoundError
 from app.database.dependencies import DbSession
 from app.modules.admin import lookups, service
 from app.modules.admin.schemas import (
     AssignIn,
     AuditRow,
     EnquiryDetail,
+    EnquiryDocumentOut,
     EnquiryRow,
     EnquiryUpdate,
     FollowUpIn,
     FollowUpOut,
+    OrganizationDetailOut,
     OrgRow,
     OrgStatusIn,
+    OverviewOut,
     StaffInviteIn,
     StaffOut,
     StaffRoleIn,
+    WorkloadOut,
 )
 from app.modules.applications.constants import PortalStatus
 from app.modules.auth import service as auth_service
@@ -32,9 +38,10 @@ from app.modules.auth.constants import StaffRole, UserStatus
 from app.modules.auth.dependencies import StaffContext, SuperAdminDep, require_staff
 from app.modules.auth.models import User
 from app.modules.enquiries.constants import EnquiryStatus, EnquiryType, Priority
-from app.modules.enquiries.models import Enquiry
+from app.modules.enquiries.models import Activity, Enquiry
 from app.modules.notifications.service import dispatch_notifications
 from app.modules.projects.constants import ProjectCategory
+from app.modules.strategic.constants import DiscussionType
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -72,6 +79,7 @@ class EnquiryFilters:
         created_to: Annotated[datetime | None, Query()] = None,
         assigned_any: Annotated[bool, Query(description="Has an owner")] = False,
         category: Annotated[ProjectCategory | None, Query(description="Project category")] = None,
+        discussion_type: Annotated[DiscussionType | None, Query()] = None,
         project_group: Annotated[Literal["it", "non_it"] | None, Query()] = None,
         updated_from: Annotated[datetime | None, Query()] = None,
         updated_to: Annotated[datetime | None, Query()] = None,
@@ -100,6 +108,7 @@ class EnquiryFilters:
             "created_to": created_to,
             "assigned_any": assigned_any,
             "category": category,
+            "discussion_type": discussion_type,
             "project_group": project_group,
             "updated_from": updated_from,
             "updated_to": updated_to,
@@ -113,12 +122,22 @@ FiltersDep = Annotated[EnquiryFilters, Depends()]
 # --------------------------------------------------------------------- overview
 @router.get(
     "/overview",
-    response_model=ApiResponse[dict[str, Any]],
+    response_model=ApiResponse[OverviewOut],
     responses=_ERR,
     summary="Dashboard counters (scoped to your role)",
 )
-def overview(staff: AdminDep, db: DbSession) -> ApiResponse[dict[str, Any]]:
+def overview(staff: AdminDep, db: DbSession) -> ApiResponse[OverviewOut]:
     return ok(service.overview(db, staff))
+
+
+@router.get(
+    "/workload",
+    response_model=ApiResponse[WorkloadOut],
+    responses=_ERR,
+    summary="Open enquiry workload counts by assignee (no capacity limits)",
+)
+def workload(staff: AdminDep, db: DbSession) -> ApiResponse[WorkloadOut]:
+    return ok(service.enquiry_workload(db, staff))
 
 
 # -------------------------------------------------------------------- enquiries
@@ -140,6 +159,19 @@ def enquiry_detail(
     enquiry_id: uuid.UUID, staff: AdminDep, db: DbSession
 ) -> ApiResponse[EnquiryDetail]:
     return ok(EnquiryDetail.model_validate(service.enquiry_detail(db, staff, enquiry_id)))
+
+
+@router.get(
+    "/enquiries/{enquiry_id}/documents",
+    response_model=ApiResponse[list[EnquiryDocumentOut]],
+    responses=_ERR,
+    summary="List enquiry attachments (financial attachments are super-admin only)",
+)
+def enquiry_documents(
+    enquiry_id: uuid.UUID, staff: AdminDep, db: DbSession, page: PageDep
+) -> ApiResponse[list[EnquiryDocumentOut]]:
+    rows, total = service.list_enquiry_documents(db, staff, enquiry_id, page.page_size, page.offset)
+    return ok([EnquiryDocumentOut(**row) for row in rows], meta=page_meta(page, total))
 
 
 def _row(db: DbSession, staff: StaffContext, enquiry_id: uuid.UUID) -> EnquiryRow:
@@ -262,12 +294,14 @@ def list_orgs(
 
 @router.get(
     "/organizations/{org_id}",
-    response_model=ApiResponse[dict[str, Any]],
+    response_model=ApiResponse[OrganizationDetailOut],
     responses=_ERR,
     summary="Organization profile + applications (financial data: super administrators only)",
 )
-def org_detail(org_id: uuid.UUID, staff: AdminDep, db: DbSession) -> ApiResponse[dict[str, Any]]:
-    return ok(service.org_detail(db, staff, org_id))
+def org_detail(
+    org_id: uuid.UUID, staff: AdminDep, db: DbSession
+) -> ApiResponse[OrganizationDetailOut]:
+    return ok(OrganizationDetailOut.model_validate(service.org_detail(db, staff, org_id)))
 
 
 @router.post(
@@ -431,6 +465,93 @@ def audit(
             for a in rows
         ],
         meta=page_meta(page, total),
+    )
+
+
+@router.get(
+    "/audit/actions",
+    response_model=ApiResponse[list[str]],
+    responses=_ERR,
+    summary="List event actions currently present in the audit log",
+)
+def audit_actions(staff: SuperAdminDep, db: DbSession) -> ApiResponse[list[str]]:
+    actions = db.execute(select(Activity.action).distinct().order_by(Activity.action)).scalars()
+    return ok(list(actions))
+
+
+@router.get(
+    "/audit/{activity_id}",
+    response_model=ApiResponse[AuditRow],
+    responses=_ERR,
+    summary="Get one audit event by id (super administrator)",
+)
+def audit_detail(
+    activity_id: uuid.UUID, staff: SuperAdminDep, db: DbSession
+) -> ApiResponse[AuditRow]:
+    activity = db.get(Activity, activity_id)
+    if activity is None:
+        raise NotFoundError("Audit event not found")
+    names = lookups.user_names(db, [activity.actor_user_id] if activity.actor_user_id else [])
+    strategic_ids = (
+        lookups.strategic_enquiry_ids(db, [activity.record_id])
+        if activity.record_type == "enquiry"
+        else set()
+    )
+    strategic = activity.record_id in strategic_ids
+    return ok(
+        AuditRow(
+            id=activity.id,
+            record_type=activity.record_type,
+            record_id=activity.record_id,
+            action=activity.action,
+            actor_type=activity.actor_type.value,
+            actor_user_id=activity.actor_user_id,
+            organization_id=activity.organization_id,
+            request_id=activity.request_id,
+            meta=activity.meta,
+            created_at=activity.created_at,
+            actor_name=names.get(activity.actor_user_id) if activity.actor_user_id else None,
+            is_strategic=strategic,
+        )
+    )
+
+
+@router.get(
+    "/audit.csv",
+    responses={**_ERR, 200: {"content": {"text/csv": {}}}},
+    summary="Export the filtered audit log as formula-safe CSV (super administrator)",
+)
+def export_audit(
+    staff: SuperAdminDep,
+    db: DbSession,
+    record_type: Annotated[str | None, Query(max_length=50)] = None,
+    action: Annotated[str | None, Query(max_length=80)] = None,
+    actor_user_id: Annotated[uuid.UUID | None, Query()] = None,
+    organization_id: Annotated[uuid.UUID | None, Query()] = None,
+    created_from: Annotated[datetime | None, Query()] = None,
+    created_to: Annotated[datetime | None, Query()] = None,
+    q: Annotated[str | None, Query(max_length=80)] = None,
+    sort: Annotated[Literal["created_at", "-created_at"], Query()] = "-created_at",
+) -> Response:
+    body = service.audit_csv(
+        db,
+        staff,
+        record_type=record_type,
+        action=action,
+        actor_user_id=actor_user_id,
+        organization_id=organization_id,
+        created_from=created_from,
+        created_to=created_to,
+        q=q,
+        ascending=sort == "created_at",
+    )
+    return Response(
+        content=body,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": 'attachment; filename="audit.csv"',
+            "Cache-Control": "private, no-store",
+        },
     )
 
 

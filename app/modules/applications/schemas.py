@@ -40,6 +40,8 @@ class ApplicationOut(BaseModel):
     cover_note: str | None
     submission_count: int
     submitted_at: datetime | None
+    last_updated: datetime
+    decided_at: datetime | None
     open_information_requests: int
 
 
@@ -67,6 +69,8 @@ def application_out(app: PortalApplication, open_requests: int) -> ApplicationOu
         cover_note=app.cover_note,
         submission_count=app.submission_count,
         submitted_at=app.submitted_at,
+        last_updated=app.updated_at,
+        decided_at=app.decided_at,
         open_information_requests=open_requests,
     )
 

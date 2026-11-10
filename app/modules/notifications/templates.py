@@ -92,6 +92,11 @@ def _portal_lines(key: TemplateKey, ctx: dict[str, str]) -> tuple[str, list[str]
             greet,
             f"We received your data request {ref}.",
             "We may contact you to verify your identity before acting on it.",
+            *(
+                [f"Confirm that this request came from you: {ctx['link']}"]
+                if ctx.get("link")
+                else []
+            ),
         ]
     if key is TemplateKey.EXPIRY_REMINDER:
         return "A document in your partner profile is about to expire", [

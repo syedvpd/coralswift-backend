@@ -8,12 +8,14 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
+from app.modules.admin import maintenance
 from app.modules.auth.constants import StaffRole
+from app.modules.content.models import ContentItem
 from app.modules.engagement.models import MeetingRequest
 from app.modules.enquiries.models import Activity
 from tests import factories
 from tests.fakes import InMemoryStorage, RecordingEmail
-from tests.helpers import make_staff, staff_headers
+from tests.helpers import last_token, make_staff, staff_headers
 
 AC = "/api/v1/admin/content"
 PC = "/api/v1/content"
@@ -87,6 +89,34 @@ def test_content_workflow_and_public_visibility(
     versions = client.get(f"{AC}/{item}/versions", headers=ca).json()["data"]
     assert [v["version_no"] for v in versions] == [2, 1]
     assert "content.published" in set(db.execute(select(Activity.action)).scalars())
+
+
+def test_scheduled_content_contract_and_maintenance_publish(
+    client: TestClient, db: Session, settings: Settings
+) -> None:
+    ca = staff(client, db, settings, StaffRole.CONTENT_ADMINISTRATOR)
+    sa = staff(client, db, settings, StaffRole.SUPER_ADMINISTRATOR)
+    item_id = new_item(client, ca, slug="scheduled-guide")
+    client.post(f"{AC}/{item_id}/submit", headers=ca)
+    client.post(f"{AC}/{item_id}/approve", headers=sa, json={})
+    schedule_url = f"{AC}/{item_id}/schedule"
+    when = datetime.now(UTC) + timedelta(minutes=5)
+    scheduled = client.post(schedule_url, headers=ca, json={"publish_at": when.isoformat()})
+    assert scheduled.status_code == 200
+    assert scheduled.json()["data"]["scheduled_publish_at"]
+    assert client.get(f"{PC}/scheduled-guide").status_code == 404
+    cancelled = client.delete(schedule_url, headers=ca)
+    assert cancelled.status_code == 200
+    assert cancelled.json()["data"]["scheduled_publish_at"] is None
+    naive = client.post(schedule_url, headers=ca, json={"publish_at": "2030-01-01T00:00:00"})
+    assert naive.status_code == 422
+
+    item = db.get(ContentItem, item_id)
+    assert item is not None
+    item.scheduled_publish_at = datetime.now(UTC) - timedelta(seconds=1)
+    db.flush()
+    assert maintenance.publish_scheduled_content(db) == 1
+    assert client.get(f"{PC}/scheduled-guide").status_code == 200
 
 
 def test_content_rejection_slug_conflict_and_permissions(
@@ -277,7 +307,21 @@ def test_newsletter_and_privacy_requests(
     assert r.status_code == 201 and r.json()["data"]["reference"].startswith("PR-")
     assert any("privacy request" in m.subject for m in email.sent if m.to == "subject@example.com")
     rows = client.get("/api/v1/admin/privacy-requests", headers=sa).json()["data"]
-    assert rows[0]["status"] == "received"
+    assert rows[0]["status"] == "received" and rows[0]["email_verified"] is False
+    blocked = client.post(
+        f"/api/v1/admin/privacy-requests/{rows[0]['id']}",
+        headers=sa,
+        json={"status": "completed", "resolution_note": "too early"},
+    )
+    assert blocked.status_code == 409 and blocked.json()["error"]["code"] == "EMAIL_NOT_VERIFIED"
+    token = last_token(email, "subject@example.com")
+    verified = client.post("/api/v1/privacy/requests/verify", json={"token": token})
+    assert (
+        verified.status_code == 200
+        and verified.json()["data"]["reference"] == r.json()["data"]["reference"]
+    )
+    again = client.post("/api/v1/privacy/requests/verify", json={"token": token})
+    assert again.status_code == 400  # single use
     done = client.post(
         f"/api/v1/admin/privacy-requests/{rows[0]['id']}",
         headers=sa,

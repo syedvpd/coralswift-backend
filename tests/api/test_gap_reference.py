@@ -48,6 +48,9 @@ def test_document_queue_scope_filters_and_no_storage_details(
     assert mine["meta"]["total"] >= 7 and {d["organization_name"] for d in mine["data"]} == {
         "Docs One Ltd"
     }
+    history = client.get(f"{ADM}/documents/{mine['data'][0]['document_id']}/history", headers=rev)
+    assert history.status_code == 200
+    assert history.json()["data"][0]["review_status"] == "pending"
 
     org1 = mine["data"][0]["organization_id"]
     assert (

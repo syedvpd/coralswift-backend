@@ -34,3 +34,9 @@ Decided already: quarantine-only uploads accepted, no malware scanner (owner, 20
 | D27 | Should partners see the eligibility outcome and reviewer reasons? | P28.1 | Show decision and a reviewer-written partner note only | Business owner |
 
 External configuration (not decisions): Brevo key, verified sender domain and SPF/DKIM/DMARC; Turnstile keys; a domain and hostnames; CORS origin value on Render; staging database and buckets; credential rotation; monitoring and backups. See `production-readiness-report.md`.
+
+## Added 2026-11-10
+| Id | Decision | Impact | Recommended |
+|---|---|---|---|
+| D28 | Confirm the partner MFA policy (required / optional / off) | MFA disable for partners follows today's "optional" behaviour | Optional, enforced once enabled |
+| D29 | Public media hosting for website images (bucket/CDN) | Cover images are https URLs only; no upload library | Use a public CDN bucket separate from private documents |

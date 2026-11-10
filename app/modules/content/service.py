@@ -136,6 +136,7 @@ def _move(
     if item.status not in allowed:
         raise _bad(f"Cannot move content from {item.status.value} to {target.value}")
     item.status = target
+    item.scheduled_publish_at = None
     _audit(db, staff, item, action, {"to": target.value})
     return item
 
@@ -172,6 +173,40 @@ def publish(db: Session, staff: StaffContext, item_id: uuid.UUID) -> ContentItem
         )
     item = _move(db, staff, item_id, {S.APPROVED}, S.PUBLISHED, "content.published")
     item.published_at = item.published_at or utcnow()
+    db.commit()
+    return item
+
+
+def schedule_publish(
+    db: Session, staff: StaffContext, item_id: uuid.UUID, publish_at: datetime
+) -> ContentItem:
+    item = get_item(db, item_id, lock=True)
+    if item.status is not S.APPROVED:
+        raise _bad("Only approved content can be scheduled")
+    if publish_at <= utcnow():
+        raise AppError(
+            "Publication time must be in the future", status_code=422, code="INVALID_TIME"
+        )
+    problems = claim_problems(db, item)
+    if problems:
+        raise AppError(
+            "Linked claims are not cleared for publication",
+            status_code=409,
+            code="CLAIMS_NOT_VERIFIED",
+            details=[{"claim": problem} for problem in problems],
+        )
+    item.scheduled_publish_at = publish_at
+    _audit(db, staff, item, "content.publication_scheduled", {"publish_at": publish_at.isoformat()})
+    db.commit()
+    return item
+
+
+def cancel_scheduled_publish(db: Session, staff: StaffContext, item_id: uuid.UUID) -> ContentItem:
+    item = get_item(db, item_id, lock=True)
+    if item.scheduled_publish_at is None:
+        raise _bad("Content has no scheduled publication")
+    item.scheduled_publish_at = None
+    _audit(db, staff, item, "content.publication_schedule_cancelled")
     db.commit()
     return item
 

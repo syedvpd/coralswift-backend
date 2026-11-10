@@ -5,12 +5,12 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
-from pydantic import BaseModel, ConfigDict, EmailStr, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 from sqlalchemy import String, cast, func, or_, select
 
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
-from app.common.validation import Short
+from app.common.validation import EmailAddress, Short
 from app.core.config import Settings, get_settings
 from app.core.exceptions import AppError, NotFoundError
 from app.core.protection import rate_limit
@@ -115,7 +115,7 @@ class InvitationIn(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    email: EmailStr
+    email: EmailAddress
     full_name: Short
     organization_id: uuid.UUID | None = None
     new_organization_legal_name: Short | None = None

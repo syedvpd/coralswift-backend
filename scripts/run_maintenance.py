@@ -1,6 +1,6 @@
 """Run scheduled maintenance once (cron / scheduler): idempotency cleanup, SLA escalation, expiry
-reminders, retention purge, notification dispatch. Uses DATABASE_URL, STORAGE_* and EMAIL_* from
-the environment, so point it at the intended environment deliberately.
+reminders, retention purge, approved content publication, notification dispatch. Uses DATABASE_URL,
+STORAGE_* and EMAIL_* from the environment, so point it at the intended environment deliberately.
 
 `--dry-run` only counts what each job would act on, inside a READ ONLY transaction; it deletes,
 changes, queues and sends nothing."""

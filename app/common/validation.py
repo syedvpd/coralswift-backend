@@ -1,10 +1,12 @@
 """Shared input types for public forms. All text is stripped; NUL bytes are rejected (PostgreSQL
 cannot store them) and phone/country/email are normalised."""
 
+import os
 import re
 from typing import Annotated
 
-from pydantic import AfterValidator, EmailStr, StringConstraints
+from email_validator import EmailNotValidError, validate_email
+from pydantic import AfterValidator, BeforeValidator, StringConstraints
 
 _PHONE_CLEAN = re.compile(r"[\s().-]")
 _PHONE_E164 = re.compile(r"^\+[1-9][0-9]{6,14}$")
@@ -62,4 +64,21 @@ Phone = Annotated[
 Country = Annotated[
     str, StringConstraints(strip_whitespace=True, max_length=2), AfterValidator(_country)
 ]
-BusinessEmail = Annotated[EmailStr, AfterValidator(lambda v: v.strip().lower())]
+
+
+def _email(value: object) -> str:
+    if not isinstance(value, str):
+        raise ValueError("must be a valid email address")
+    # email-validator rejects special-use names by default. Permit these only for local/dev
+    # and automated test deployments, where .test addresses are intentionally used.
+    test_environment = os.getenv("APP_ENV", "development").lower() in {"development", "testing"}
+    try:
+        return validate_email(
+            value.strip(), check_deliverability=False, test_environment=test_environment
+        ).normalized.lower()
+    except EmailNotValidError as exc:
+        raise ValueError(str(exc)) from exc
+
+
+EmailAddress = Annotated[str, BeforeValidator(_email), StringConstraints(max_length=254)]
+BusinessEmail = EmailAddress

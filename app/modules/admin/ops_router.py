@@ -7,7 +7,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, select, update
+from sqlalchemy import case, func, literal_column, select, update
 
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
@@ -18,7 +18,15 @@ from app.database.dependencies import DbSession
 from app.modules.admin import lookups, service
 from app.modules.admin import settings_service as cfg
 from app.modules.admin.models import EnquiryFollowUp, NotificationTemplate
-from app.modules.admin.schemas import NotificationRow
+from app.modules.admin.schemas import (
+    CommunicationReportOut,
+    DocumentReviewReportOut,
+    FollowUpReportOut,
+    KpisOut,
+    NotificationRow,
+    ReportCountOut,
+    ReportPeriodCountOut,
+)
 from app.modules.applications.constants import PortalStatus
 from app.modules.applications.models import EligibilityVerification, PortalApplication
 from app.modules.auth import service as auth_service
@@ -32,7 +40,11 @@ from app.modules.enquiries.models import Enquiry
 from app.modules.notifications.constants import DeliveryStatus, TemplateKey
 from app.modules.notifications.models import Notification
 from app.modules.notifications.service import dispatch_notifications
-from app.modules.notifications.templates import render_override, validate_template
+from app.modules.notifications.templates import (
+    ALLOWED_PLACEHOLDERS,
+    render_override,
+    validate_template,
+)
 from app.modules.partner_documents.models import PartnerDocumentVersion
 
 
@@ -60,6 +72,12 @@ class SettingsOut(BaseModel):
     values: dict[str, str]  # only settings that have been set
     allowed_keys: list[str]
     definitions: list[SettingDefinition]
+
+
+ReportStaffDep = Annotated[
+    StaffContext,
+    Depends(require_staff(StaffRole.SUPER_ADMINISTRATOR, StaffRole.BUSINESS_DEVELOPMENT_MANAGER)),
+]
 
 
 def _describe(key: str) -> dict[str, Any]:
@@ -167,6 +185,10 @@ class TemplateOut(BaseModel):
     html_body: str | None
 
 
+class TemplatePlaceholderOut(BaseModel):
+    name: str
+
+
 def _tkey(key: str) -> TemplateKey:
     try:
         return TemplateKey(key)
@@ -196,6 +218,18 @@ def list_templates(staff: SuperAdminDep, db: DbSession) -> ApiResponse[list[Temp
             )
         )
     return ok(out)
+
+
+@router.get(
+    "/notification-templates/placeholders",
+    response_model=ApiResponse[list[TemplatePlaceholderOut]],
+    responses=_ERR,
+    summary="List placeholders accepted by notification templates",
+)
+def list_template_placeholders(
+    staff: SuperAdminDep,
+) -> ApiResponse[list[TemplatePlaceholderOut]]:
+    return ok([TemplatePlaceholderOut(name=name) for name in sorted(ALLOWED_PLACEHOLDERS)])
 
 
 @router.put(
@@ -338,7 +372,7 @@ def mfa_reset(user_id: uuid.UUID, staff: SuperAdminDep, db: DbSession) -> ApiRes
 # ----------------------------------------------------------------------- KPIs
 @router.get(
     "/reports/kpis",
-    response_model=ApiResponse[dict[str, Any]],
+    response_model=ApiResponse[KpisOut],
     responses=_ERR,
     summary="Business KPIs (PRD s.20). No targets: the PRD asks for a baseline first",
 )
@@ -347,7 +381,7 @@ def kpis(
     db: DbSession,
     created_from: Annotated[datetime | None, Query()] = None,
     created_to: Annotated[datetime | None, Query()] = None,
-) -> ApiResponse[dict[str, Any]]:
+) -> ApiResponse[KpisOut]:
     types = service.visible_types(staff)
     base = select(Enquiry).where(Enquiry.enquiry_type.in_(types))
     if created_from:
@@ -453,6 +487,149 @@ def kpis(
             round(float(hours), 2) if hours is not None else None
         )
     return ok(out)
+
+
+def _date_filters(
+    column: Any, created_from: datetime | None, created_to: datetime | None
+) -> list[Any]:
+    filters: list[Any] = []
+    if created_from is not None:
+        filters.append(column >= created_from)
+    if created_to is not None:
+        filters.append(column < created_to)
+    return filters
+
+
+@router.get(
+    "/reports/follow-ups",
+    response_model=ApiResponse[FollowUpReportOut],
+    responses=_ERR,
+    summary="Follow-up counts by kind and open/completed/cancelled state",
+)
+def follow_up_report(
+    staff: ReportStaffDep,
+    db: DbSession,
+    created_from: Annotated[datetime | None, Query()] = None,
+    created_to: Annotated[datetime | None, Query()] = None,
+) -> ApiResponse[FollowUpReportOut]:
+    filters = [Enquiry.enquiry_type.in_(service.visible_types(staff))]
+    filters.extend(_date_filters(EnquiryFollowUp.created_at, created_from, created_to))
+    # literal_column keeps the CASE and GROUP BY expressions textually identical (no bind params)
+    state = case(
+        (EnquiryFollowUp.cancelled_at.is_not(None), literal_column("'cancelled'")),
+        (EnquiryFollowUp.completed_at.is_not(None), literal_column("'completed'")),
+        else_=literal_column("'open'"),
+    )
+    month = func.date_trunc(literal_column("'month'"), EnquiryFollowUp.created_at)
+    by_kind = db.execute(
+        select(EnquiryFollowUp.kind, func.count())
+        .join(Enquiry, Enquiry.id == EnquiryFollowUp.enquiry_id)
+        .where(*filters)
+        .group_by(EnquiryFollowUp.kind)
+        .order_by(EnquiryFollowUp.kind)
+    ).all()
+    by_status = db.execute(
+        select(state, func.count())
+        .join(Enquiry, Enquiry.id == EnquiryFollowUp.enquiry_id)
+        .where(*filters)
+        .group_by(state)
+        .order_by(state)
+    ).all()
+    by_month = db.execute(
+        select(month, func.count())
+        .join(Enquiry, Enquiry.id == EnquiryFollowUp.enquiry_id)
+        .where(*filters)
+        .group_by(month)
+        .order_by(month)
+    ).all()
+    return ok(
+        FollowUpReportOut(
+            total=sum(count for _key, count in by_kind),
+            by_kind=[ReportCountOut(key=str(key), count=count) for key, count in by_kind],
+            by_status=[ReportCountOut(key=str(key), count=count) for key, count in by_status],
+            by_month=[
+                ReportPeriodCountOut(period=period, count=count) for period, count in by_month
+            ],
+        )
+    )
+
+
+@router.get(
+    "/reports/document-review",
+    response_model=ApiResponse[DocumentReviewReportOut],
+    responses=_ERR,
+    summary="Partner document version review counts and observed average turnaround",
+)
+def document_review_report(
+    staff: SuperAdminDep,
+    db: DbSession,
+    created_from: Annotated[datetime | None, Query()] = None,
+    created_to: Annotated[datetime | None, Query()] = None,
+) -> ApiResponse[DocumentReviewReportOut]:
+    filters = _date_filters(PartnerDocumentVersion.uploaded_at, created_from, created_to)
+    rows = db.execute(
+        select(PartnerDocumentVersion.review_status, func.count())
+        .where(*filters)
+        .group_by(PartnerDocumentVersion.review_status)
+        .order_by(PartnerDocumentVersion.review_status)
+    ).all()
+    avg = db.execute(
+        select(
+            func.avg(
+                func.extract(
+                    "epoch", PartnerDocumentVersion.reviewed_at - PartnerDocumentVersion.uploaded_at
+                )
+                / 3600
+            )
+        ).where(*filters, PartnerDocumentVersion.reviewed_at.is_not(None))
+    ).scalar_one()
+    return ok(
+        DocumentReviewReportOut(
+            total_versions=sum(count for _status, count in rows),
+            by_review_status=[
+                ReportCountOut(key=status.value, count=count) for status, count in rows
+            ],
+            avg_turnaround_hours=round(float(avg), 2) if avg is not None else None,
+        )
+    )
+
+
+@router.get(
+    "/reports/communications",
+    response_model=ApiResponse[CommunicationReportOut],
+    responses=_ERR,
+    summary="Email outbox counts by delivery status and template",
+)
+def communication_report(
+    staff: SuperAdminDep,
+    db: DbSession,
+    created_from: Annotated[datetime | None, Query()] = None,
+    created_to: Annotated[datetime | None, Query()] = None,
+) -> ApiResponse[CommunicationReportOut]:
+    filters = _date_filters(Notification.created_at, created_from, created_to)
+    by_status = db.execute(
+        select(Notification.delivery_status, func.count())
+        .where(*filters)
+        .group_by(Notification.delivery_status)
+        .order_by(Notification.delivery_status)
+    ).all()
+    by_template = db.execute(
+        select(Notification.template_key, func.count())
+        .where(*filters)
+        .group_by(Notification.template_key)
+        .order_by(Notification.template_key)
+    ).all()
+    return ok(
+        CommunicationReportOut(
+            total=sum(count for _key, count in by_status),
+            by_delivery_status=[
+                ReportCountOut(key=status.value, count=count) for status, count in by_status
+            ],
+            by_template=[
+                ReportCountOut(key=template.value, count=count) for template, count in by_template
+            ],
+        )
+    )
 
 
 # ------------------------------------------------- notification failure visibility

@@ -44,6 +44,28 @@
       "title": "Id",
       "type": "string"
      },
+     "invitation_delivery_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Invitation Delivery At"
+     },
+     "invitation_delivery_status": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DeliveryStatus"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "invitation_state": {
       "enum": [
        "none",
@@ -158,6 +180,53 @@
     "title": "AccountEvent",
     "type": "object"
    },
+   "AccountMetricsOut": {
+    "properties": {
+     "accounts_by_status": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Accounts By Status",
+      "type": "object"
+     },
+     "accounts_by_type": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Accounts By Type",
+      "type": "object"
+     },
+     "accounts_never_logged_in": {
+      "title": "Accounts Never Logged In",
+      "type": "integer"
+     },
+     "active_partner_accounts": {
+      "title": "Active Partner Accounts",
+      "type": "integer"
+     },
+     "staff_by_role": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Staff By Role",
+      "type": "object"
+     },
+     "total_accounts": {
+      "title": "Total Accounts",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "total_accounts",
+     "accounts_by_type",
+     "accounts_by_status",
+     "staff_by_role",
+     "active_partner_accounts",
+     "accounts_never_logged_in"
+    ],
+    "title": "AccountMetricsOut",
+    "type": "object"
+   },
    "AccountOut": {
     "properties": {
      "created_at": {
@@ -177,6 +246,28 @@
       "format": "uuid",
       "title": "Id",
       "type": "string"
+     },
+     "invitation_delivery_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Invitation Delivery At"
+     },
+     "invitation_delivery_status": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DeliveryStatus"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "invitation_state": {
       "enum": [
@@ -316,6 +407,12 @@
    },
    "AdminChangeRequestOut": {
     "properties": {
+     "before": {
+      "additionalProperties": true,
+      "default": {},
+      "title": "Before",
+      "type": "object"
+     },
      "changes": {
       "additionalProperties": true,
       "title": "Changes",
@@ -359,6 +456,17 @@
       "title": "Organization Id",
       "type": "string"
      },
+     "organization_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Organization Name"
+     },
      "reason": {
       "title": "Reason",
       "type": "string"
@@ -397,6 +505,19 @@
       "title": "Body",
       "type": "string"
      },
+     "canonical_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://[^\\s<>\\\"']+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Canonical Url"
+     },
      "category": {
       "anyOf": [
        {
@@ -427,6 +548,31 @@
       "title": "Id",
       "type": "string"
      },
+     "image_alt": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Image Alt"
+     },
+     "image_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://[^\\s<>\\\"']+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Image Url"
+     },
      "last_reviewed_at": {
       "anyOf": [
        {
@@ -438,6 +584,43 @@
        }
       ],
       "title": "Last Reviewed At"
+     },
+     "og_description": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Og Description"
+     },
+     "og_image_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://[^\\s<>\\\"']+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Og Image Url"
+     },
+     "og_title": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Og Title"
      },
      "owner_id": {
       "format": "uuid",
@@ -478,6 +661,42 @@
        }
       ],
       "title": "Reviewer Id"
+     },
+     "scheduled_publish_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Scheduled Publish At"
+     },
+     "seo_description": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Seo Description"
+     },
+     "seo_title": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Seo Title"
      },
      "slug": {
       "title": "Slug",
@@ -567,6 +786,44 @@
      }
     },
     "title": "ApiResponse[AccountDetail]",
+    "type": "object"
+   },
+   "ApiResponse_AccountMetricsOut_": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AccountMetricsOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[AccountMetricsOut]",
     "type": "object"
    },
    "ApiResponse_AccountOut_": {
@@ -683,6 +940,44 @@
     "title": "ApiResponse[ApplicationOut]",
     "type": "object"
    },
+   "ApiResponse_AuditRow_": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AuditRow"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[AuditRow]",
+    "type": "object"
+   },
    "ApiResponse_ChangeRequestOut_": {
     "properties": {
      "data": {
@@ -759,6 +1054,44 @@
     "title": "ApiResponse[ClaimOut]",
     "type": "object"
    },
+   "ApiResponse_CommunicationReportOut_": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/CommunicationReportOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[CommunicationReportOut]",
+    "type": "object"
+   },
    "ApiResponse_CompletionOut_": {
     "properties": {
      "data": {
@@ -795,6 +1128,44 @@
      }
     },
     "title": "ApiResponse[CompletionOut]",
+    "type": "object"
+   },
+   "ApiResponse_DocumentReviewReportOut_": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DocumentReviewReportOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[DocumentReviewReportOut]",
     "type": "object"
    },
    "ApiResponse_EligibilityOut_": {
@@ -911,6 +1282,44 @@
     "title": "ApiResponse[EnquiryRow]",
     "type": "object"
    },
+   "ApiResponse_FeedItemOut_": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/FeedItemOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[FeedItemOut]",
+    "type": "object"
+   },
    "ApiResponse_FollowUpOut_": {
     "properties": {
      "data": {
@@ -949,6 +1358,44 @@
     "title": "ApiResponse[FollowUpOut]",
     "type": "object"
    },
+   "ApiResponse_FollowUpReportOut_": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/FollowUpReportOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[FollowUpReportOut]",
+    "type": "object"
+   },
    "ApiResponse_InvitationOut_": {
     "properties": {
      "data": {
@@ -985,6 +1432,44 @@
      }
     },
     "title": "ApiResponse[InvitationOut]",
+    "type": "object"
+   },
+   "ApiResponse_KpisOut_": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/KpisOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[KpisOut]",
     "type": "object"
    },
    "ApiResponse_LaunchReadinessOut_": {
@@ -1171,6 +1656,44 @@
     "title": "ApiResponse[NoteOut]",
     "type": "object"
    },
+   "ApiResponse_OrganizationDetailOut_": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/OrganizationDetailOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[OrganizationDetailOut]",
+    "type": "object"
+   },
    "ApiResponse_OrganizationOut_": {
     "properties": {
      "data": {
@@ -1207,6 +1730,82 @@
      }
     },
     "title": "ApiResponse[OrganizationOut]",
+    "type": "object"
+   },
+   "ApiResponse_OverviewOut_": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/OverviewOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[OverviewOut]",
+    "type": "object"
+   },
+   "ApiResponse_PartnerDocumentRequestOut_": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PartnerDocumentRequestOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[PartnerDocumentRequestOut]",
     "type": "object"
    },
    "ApiResponse_PartnerMessageOut_": {
@@ -1283,6 +1882,44 @@
      }
     },
     "title": "ApiResponse[PartnerNotificationOut]",
+    "type": "object"
+   },
+   "ApiResponse_PartnerPrivacyRequestOut_": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PartnerPrivacyRequestOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[PartnerPrivacyRequestOut]",
     "type": "object"
    },
    "ApiResponse_PrivacyRequestOut_": {
@@ -1627,6 +2264,44 @@
     "title": "ApiResponse[SettingsOut]",
     "type": "object"
    },
+   "ApiResponse_StaffDocumentRequestOut_": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/StaffDocumentRequestOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[StaffDocumentRequestOut]",
+    "type": "object"
+   },
    "ApiResponse_StaffOut_": {
     "properties": {
      "data": {
@@ -1853,6 +2528,44 @@
      }
     },
     "title": "ApiResponse[VersionOut]",
+    "type": "object"
+   },
+   "ApiResponse_WorkloadOut_": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/WorkloadOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[WorkloadOut]",
     "type": "object"
    },
    "ApiResponse_dict_str__Any__": {
@@ -2483,6 +3196,90 @@
     "title": "ApiResponse[list[DocumentQueueRow]]",
     "type": "object"
    },
+   "ApiResponse_list_DocumentReviewHistoryRow__": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/DocumentReviewHistoryRow"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data"
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[list[DocumentReviewHistoryRow]]",
+    "type": "object"
+   },
+   "ApiResponse_list_EditableFieldOut__": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/EditableFieldOut"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data"
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[list[EditableFieldOut]]",
+    "type": "object"
+   },
    "ApiResponse_list_EligibilityOut__": {
     "properties": {
      "data": {
@@ -2525,6 +3322,48 @@
     "title": "ApiResponse[list[EligibilityOut]]",
     "type": "object"
    },
+   "ApiResponse_list_EnquiryDocumentOut__": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/EnquiryDocumentOut"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data"
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[list[EnquiryDocumentOut]]",
+    "type": "object"
+   },
    "ApiResponse_list_EnquiryRow__": {
     "properties": {
      "data": {
@@ -2565,6 +3404,48 @@
      }
     },
     "title": "ApiResponse[list[EnquiryRow]]",
+    "type": "object"
+   },
+   "ApiResponse_list_FeedItemOut__": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/FeedItemOut"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data"
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[list[FeedItemOut]]",
     "type": "object"
    },
    "ApiResponse_list_FollowUpOut__": {
@@ -2693,6 +3574,48 @@
     "title": "ApiResponse[list[NotificationRow]]",
     "type": "object"
    },
+   "ApiResponse_list_OrgActivityRow__": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/OrgActivityRow"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data"
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[list[OrgActivityRow]]",
+    "type": "object"
+   },
    "ApiResponse_list_OrgRow__": {
     "properties": {
      "data": {
@@ -2733,6 +3656,48 @@
      }
     },
     "title": "ApiResponse[list[OrgRow]]",
+    "type": "object"
+   },
+   "ApiResponse_list_PartnerDocumentRequestOut__": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/PartnerDocumentRequestOut"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data"
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[list[PartnerDocumentRequestOut]]",
     "type": "object"
    },
    "ApiResponse_list_PartnerEnquiryOut__": {
@@ -2901,6 +3866,48 @@
      }
     },
     "title": "ApiResponse[list[PartnerNotificationOut]]",
+    "type": "object"
+   },
+   "ApiResponse_list_PartnerPrivacyRequestOut__": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/PartnerPrivacyRequestOut"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data"
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[list[PartnerPrivacyRequestOut]]",
     "type": "object"
    },
    "ApiResponse_list_PrivacyRequestOut__": {
@@ -3113,6 +4120,48 @@
     "title": "ApiResponse[list[RevisionOut]]",
     "type": "object"
    },
+   "ApiResponse_list_RevisionRow__": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/RevisionRow"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data"
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[list[RevisionRow]]",
+    "type": "object"
+   },
    "ApiResponse_list_SessionOut__": {
     "properties": {
      "data": {
@@ -3153,6 +4202,48 @@
      }
     },
     "title": "ApiResponse[list[SessionOut]]",
+    "type": "object"
+   },
+   "ApiResponse_list_StaffDocumentRequestOut__": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/StaffDocumentRequestOut"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data"
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[list[StaffDocumentRequestOut]]",
     "type": "object"
    },
    "ApiResponse_list_StaffOut__": {
@@ -3239,6 +4330,48 @@
     "title": "ApiResponse[list[TemplateOut]]",
     "type": "object"
    },
+   "ApiResponse_list_TemplatePlaceholderOut__": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/TemplatePlaceholderOut"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data"
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[list[TemplatePlaceholderOut]]",
+    "type": "object"
+   },
    "ApiResponse_list_dict_str__Any___": {
     "properties": {
      "data": {
@@ -3282,6 +4415,48 @@
     "title": "ApiResponse[list[dict[str, Any]]]",
     "type": "object"
    },
+   "ApiResponse_list_str__": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data"
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[list[str]]",
+    "type": "object"
+   },
    "ApplicationOut": {
     "description": "Partner-safe view: no assignee, no reviewer reasons, no internal stage notes.",
     "properties": {
@@ -3296,9 +4471,26 @@
       ],
       "title": "Cover Note"
      },
+     "decided_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Decided At"
+     },
      "id": {
       "format": "uuid",
       "title": "Id",
+      "type": "string"
+     },
+     "last_updated": {
+      "format": "date-time",
+      "title": "Last Updated",
       "type": "string"
      },
      "open_information_requests": {
@@ -3345,6 +4537,8 @@
      "cover_note",
      "submission_count",
      "submitted_at",
+     "last_updated",
+     "decided_at",
      "open_information_requests"
     ],
     "title": "ApplicationOut",
@@ -3588,7 +4782,7 @@
       "type": "string"
      },
      "email": {
-      "format": "email",
+      "maxLength": 254,
       "title": "Email",
       "type": "string"
      },
@@ -3719,6 +4913,19 @@
       "description": "pdf, png, jpg, docx or xlsx",
       "title": "File",
       "type": "string"
+     },
+     "request_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "Fulfils this document request",
+      "title": "Request Id"
      }
     },
     "required": [
@@ -4047,6 +5254,35 @@
     "title": "ClientReference",
     "type": "object"
    },
+   "CommunicationReportOut": {
+    "properties": {
+     "by_delivery_status": {
+      "items": {
+       "$ref": "#/components/schemas/ReportCountOut"
+      },
+      "title": "By Delivery Status",
+      "type": "array"
+     },
+     "by_template": {
+      "items": {
+       "$ref": "#/components/schemas/ReportCountOut"
+      },
+      "title": "By Template",
+      "type": "array"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "total",
+     "by_delivery_status",
+     "by_template"
+    ],
+    "title": "CommunicationReportOut",
+    "type": "object"
+   },
    "CompletionOut": {
     "properties": {
      "complete": {
@@ -4077,7 +5313,7 @@
     "additionalProperties": false,
     "properties": {
      "business_email": {
-      "format": "email",
+      "maxLength": 254,
       "title": "Business Email",
       "type": "string"
      },
@@ -4182,6 +5418,19 @@
       "title": "Body",
       "type": "string"
      },
+     "canonical_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://[^\\s<>\\\"']+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Canonical Url"
+     },
      "category": {
       "anyOf": [
        {
@@ -4205,6 +5454,92 @@
      },
      "content_type": {
       "$ref": "#/components/schemas/ContentType"
+     },
+     "image_alt": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Image Alt"
+     },
+     "image_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://[^\\s<>\\\"']+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Image Url"
+     },
+     "og_description": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Og Description"
+     },
+     "og_image_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://[^\\s<>\\\"']+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Og Image Url"
+     },
+     "og_title": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Og Title"
+     },
+     "seo_description": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Seo Description"
+     },
+     "seo_title": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Seo Title"
      },
      "slug": {
       "maxLength": 120,
@@ -4289,6 +5624,19 @@
       ],
       "title": "Body"
      },
+     "canonical_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://[^\\s<>\\\"']+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Canonical Url"
+     },
      "category": {
       "anyOf": [
        {
@@ -4316,6 +5664,92 @@
        }
       ],
       "title": "Claim Ids"
+     },
+     "image_alt": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Image Alt"
+     },
+     "image_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://[^\\s<>\\\"']+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Image Url"
+     },
+     "og_description": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Og Description"
+     },
+     "og_image_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://[^\\s<>\\\"']+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Og Image Url"
+     },
+     "og_title": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Og Title"
+     },
+     "seo_description": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Seo Description"
+     },
+     "seo_title": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Seo Title"
      },
      "summary": {
       "anyOf": [
@@ -4553,6 +5987,98 @@
     "title": "DocumentQueueRow",
     "type": "object"
    },
+   "DocumentRequestIn": {
+    "additionalProperties": false,
+    "properties": {
+     "category": {
+      "$ref": "#/components/schemas/PartnerDocCategory"
+     },
+     "due_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Due At"
+     },
+     "note": {
+      "maxLength": 4000,
+      "minLength": 1,
+      "title": "Note",
+      "type": "string"
+     }
+    },
+    "required": [
+     "category",
+     "note"
+    ],
+    "title": "DocumentRequestIn",
+    "type": "object"
+   },
+   "DocumentReviewHistoryRow": {
+    "properties": {
+     "review_comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Review Comment"
+     },
+     "review_status": {
+      "$ref": "#/components/schemas/ReviewStatus"
+     },
+     "reviewed_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reviewed At"
+     },
+     "reviewed_by_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reviewed By Name"
+     },
+     "uploaded_at": {
+      "format": "date-time",
+      "title": "Uploaded At",
+      "type": "string"
+     },
+     "version_no": {
+      "title": "Version No",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "version_no",
+     "review_status",
+     "review_comment",
+     "reviewed_by_name",
+     "reviewed_at",
+     "uploaded_at"
+    ],
+    "title": "DocumentReviewHistoryRow",
+    "type": "object"
+   },
    "DocumentReviewIn": {
     "additionalProperties": false,
     "properties": {
@@ -4590,6 +6116,39 @@
      "status"
     ],
     "title": "DocumentReviewIn",
+    "type": "object"
+   },
+   "DocumentReviewReportOut": {
+    "properties": {
+     "avg_turnaround_hours": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg Turnaround Hours"
+     },
+     "by_review_status": {
+      "items": {
+       "$ref": "#/components/schemas/ReportCountOut"
+      },
+      "title": "By Review Status",
+      "type": "array"
+     },
+     "total_versions": {
+      "title": "Total Versions",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "total_versions",
+     "by_review_status",
+     "avg_turnaround_hours"
+    ],
+    "title": "DocumentReviewReportOut",
     "type": "object"
    },
    "DraftIn": {
@@ -4646,6 +6205,39 @@
      }
     },
     "title": "DraftUpdate",
+    "type": "object"
+   },
+   "EditableFieldOut": {
+    "properties": {
+     "approval_required": {
+      "title": "Approval Required",
+      "type": "boolean"
+     },
+     "direct_update": {
+      "title": "Direct Update",
+      "type": "boolean"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "null_clears": {
+      "title": "Null Clears",
+      "type": "boolean"
+     },
+     "nullable": {
+      "title": "Nullable",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "name",
+     "direct_update",
+     "approval_required",
+     "nullable",
+     "null_clears"
+    ],
+    "title": "EditableFieldOut",
     "type": "object"
    },
    "EligibilityIn": {
@@ -4853,41 +6445,180 @@
     "title": "EngagementPathway",
     "type": "string"
    },
+   "EnquiryCompanyOut": {
+    "properties": {
+     "country": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Country"
+     },
+     "legal_name": {
+      "title": "Legal Name",
+      "type": "string"
+     },
+     "registered_address": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Registered Address"
+     },
+     "website": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Website"
+     },
+     "year_established": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Year Established"
+     }
+    },
+    "required": [
+     "legal_name",
+     "website",
+     "country",
+     "year_established",
+     "registered_address"
+    ],
+    "title": "EnquiryCompanyOut",
+    "type": "object"
+   },
+   "EnquiryContactOut": {
+    "properties": {
+     "business_email": {
+      "format": "email",
+      "title": "Business Email",
+      "type": "string"
+     },
+     "consent_notice_version": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Consent Notice Version"
+     },
+     "consent_status": {
+      "title": "Consent Status",
+      "type": "string"
+     },
+     "consent_timestamp": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Consent Timestamp"
+     },
+     "country": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Country"
+     },
+     "designation": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Designation"
+     },
+     "full_name": {
+      "title": "Full Name",
+      "type": "string"
+     },
+     "phone": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone"
+     }
+    },
+    "required": [
+     "full_name",
+     "designation",
+     "business_email",
+     "phone",
+     "country",
+     "consent_status",
+     "consent_timestamp",
+     "consent_notice_version"
+    ],
+    "title": "EnquiryContactOut",
+    "type": "object"
+   },
    "EnquiryDetail": {
     "properties": {
      "company": {
       "anyOf": [
        {
-        "additionalProperties": true,
-        "type": "object"
+        "$ref": "#/components/schemas/EnquiryCompanyOut"
        },
        {
         "type": "null"
        }
-      ],
-      "title": "Company"
+      ]
      },
      "contact": {
-      "additionalProperties": true,
-      "title": "Contact",
-      "type": "object"
+      "$ref": "#/components/schemas/EnquiryContactOut"
      },
      "details": {
       "anyOf": [
        {
-        "additionalProperties": true,
-        "type": "object"
+        "$ref": "#/components/schemas/EnquiryDetailsOut"
        },
        {
         "type": "null"
        }
-      ],
-      "title": "Details"
+      ]
      },
      "documents": {
       "items": {
-       "additionalProperties": true,
-       "type": "object"
+       "$ref": "#/components/schemas/EnquiryDocumentOut"
       },
       "title": "Documents",
       "type": "array"
@@ -4924,6 +6655,373 @@
      "follow_ups"
     ],
     "title": "EnquiryDetail",
+    "type": "object"
+   },
+   "EnquiryDetailsOut": {
+    "properties": {
+     "access_classification": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Access Classification"
+     },
+     "application_status": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Application Status"
+     },
+     "business_overview": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Business Overview"
+     },
+     "calendar_checked": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Calendar Checked"
+     },
+     "client_experience": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Client Experience"
+     },
+     "client_references": {
+      "anyOf": [
+       {
+        "items": {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Client References"
+     },
+     "confidential_summary": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Confidential Summary"
+     },
+     "confirmed_end": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Confirmed End"
+     },
+     "confirmed_start": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Confirmed Start"
+     },
+     "decision_note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Decision Note"
+     },
+     "discussion_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Discussion Type"
+     },
+     "estimated_volume": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Estimated Volume"
+     },
+     "expected_timeline": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expected Timeline"
+     },
+     "geography": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Geography"
+     },
+     "infrastructure_summary": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Infrastructure Summary"
+     },
+     "preferred_engagement_pathway": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Preferred Engagement Pathway"
+     },
+     "preferred_slots": {
+      "anyOf": [
+       {
+        "items": {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Preferred Slots"
+     },
+     "project_category": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Project Category"
+     },
+     "purpose": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Purpose"
+     },
+     "requirement_summary": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Requirement Summary"
+     },
+     "scope": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Scope"
+     },
+     "security_constraints": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Security Constraints"
+     },
+     "service_categories": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Service Categories"
+     },
+     "status": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status"
+     },
+     "timezone": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Timezone"
+     },
+     "turnover_range": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Turnover Range"
+     },
+     "workforce_range": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Workforce Range"
+     }
+    },
+    "title": "EnquiryDetailsOut",
+    "type": "object"
+   },
+   "EnquiryDocumentOut": {
+    "properties": {
+     "category": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Category"
+     },
+     "classification": {
+      "title": "Classification",
+      "type": "string"
+     },
+     "content_type": {
+      "title": "Content Type",
+      "type": "string"
+     },
+     "file_size": {
+      "title": "File Size",
+      "type": "integer"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "original_filename": {
+      "title": "Original Filename",
+      "type": "string"
+     },
+     "upload_status": {
+      "title": "Upload Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "original_filename",
+     "content_type",
+     "file_size",
+     "category",
+     "classification",
+     "upload_status"
+    ],
+    "title": "EnquiryDocumentOut",
     "type": "object"
    },
    "EnquiryRow": {
@@ -5195,6 +7293,97 @@
     "title": "EvidenceCategory",
     "type": "string"
    },
+   "FeedItemOut": {
+    "properties": {
+     "archived_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Archived At"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "is_read": {
+      "title": "Is Read",
+      "type": "boolean"
+     },
+     "is_strategic": {
+      "title": "Is Strategic",
+      "type": "boolean"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "read_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Read At"
+     },
+     "record_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Record Id"
+     },
+     "record_type": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Record Type"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "kind",
+     "title",
+     "record_type",
+     "record_id",
+     "is_strategic",
+     "created_at",
+     "read_at",
+     "is_read",
+     "archived_at"
+    ],
+    "title": "FeedItemOut",
+    "type": "object"
+   },
    "FollowUpIn": {
     "additionalProperties": false,
     "properties": {
@@ -5381,6 +7570,43 @@
     "title": "FollowUpOut",
     "type": "object"
    },
+   "FollowUpReportOut": {
+    "properties": {
+     "by_kind": {
+      "items": {
+       "$ref": "#/components/schemas/ReportCountOut"
+      },
+      "title": "By Kind",
+      "type": "array"
+     },
+     "by_month": {
+      "items": {
+       "$ref": "#/components/schemas/ReportPeriodCountOut"
+      },
+      "title": "By Month",
+      "type": "array"
+     },
+     "by_status": {
+      "items": {
+       "$ref": "#/components/schemas/ReportCountOut"
+      },
+      "title": "By Status",
+      "type": "array"
+     },
+     "total": {
+      "title": "Total",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "total",
+     "by_kind",
+     "by_status",
+     "by_month"
+    ],
+    "title": "FollowUpReportOut",
+    "type": "object"
+   },
    "FollowUpUpdate": {
     "additionalProperties": false,
     "description": "Only the fields you send change; send null to clear due_at or assignee_id.",
@@ -5543,7 +7769,7 @@
     "description": "Invite a partner user. Either target an existing organization or create a new one.",
     "properties": {
      "email": {
-      "format": "email",
+      "maxLength": 254,
       "title": "Email",
       "type": "string"
      },
@@ -5611,6 +7837,197 @@
     "title": "InvitationOut",
     "type": "object"
    },
+   "KpiCompletionOut": {
+    "properties": {
+     "by_status": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "By Status",
+      "type": "object"
+     },
+     "created": {
+      "title": "Created",
+      "type": "integer"
+     },
+     "rate": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rate"
+     },
+     "submitted": {
+      "title": "Submitted",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "created",
+     "submitted",
+     "rate",
+     "by_status"
+    ],
+    "title": "KpiCompletionOut",
+    "type": "object"
+   },
+   "KpiCountOut": {
+    "properties": {
+     "count": {
+      "title": "Count",
+      "type": "integer"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     },
+     "type": {
+      "title": "Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "type",
+     "source",
+     "count"
+    ],
+    "title": "KpiCountOut",
+    "type": "object"
+   },
+   "KpiPortalAdoptionOut": {
+    "properties": {
+     "active_partner_users": {
+      "title": "Active Partner Users",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "active_partner_users"
+    ],
+    "title": "KpiPortalAdoptionOut",
+    "type": "object"
+   },
+   "KpiStatusCountOut": {
+    "properties": {
+     "count": {
+      "title": "Count",
+      "type": "integer"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "type": {
+      "title": "Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "type",
+     "status",
+     "count"
+    ],
+    "title": "KpiStatusCountOut",
+    "type": "object"
+   },
+   "KpisOut": {
+    "properties": {
+     "avg_hours_to_first_follow_up": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avg Hours To First Follow Up"
+     },
+     "document_review_turnaround_hours_avg": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Document Review Turnaround Hours Avg"
+     },
+     "eligibility_outcomes_recorded": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "type": "integer"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Eligibility Outcomes Recorded"
+     },
+     "enquiries_by_type_and_source": {
+      "items": {
+       "$ref": "#/components/schemas/KpiCountOut"
+      },
+      "title": "Enquiries By Type And Source",
+      "type": "array"
+     },
+     "enquiries_by_type_and_status": {
+      "items": {
+       "$ref": "#/components/schemas/KpiStatusCountOut"
+      },
+      "title": "Enquiries By Type And Status",
+      "type": "array"
+     },
+     "meeting_requests_by_status": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Meeting Requests By Status",
+      "type": "object"
+     },
+     "overdue_follow_ups": {
+      "title": "Overdue Follow Ups",
+      "type": "integer"
+     },
+     "partner_application_completion": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/KpiCompletionOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "portal_adoption": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/KpiPortalAdoptionOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "avg_hours_to_first_follow_up",
+     "enquiries_by_type_and_source",
+     "enquiries_by_type_and_status",
+     "overdue_follow_ups",
+     "meeting_requests_by_status"
+    ],
+    "title": "KpisOut",
+    "type": "object"
+   },
    "LaunchReadinessOut": {
     "properties": {
      "contact": {
@@ -5657,7 +8074,7 @@
     "additionalProperties": false,
     "properties": {
      "email": {
-      "format": "email",
+      "maxLength": 254,
       "title": "Email",
       "type": "string"
      },
@@ -5677,6 +8094,9 @@
    },
    "MeOut": {
     "properties": {
+     "account_status": {
+      "$ref": "#/components/schemas/UserStatus"
+     },
      "email": {
       "title": "Email",
       "type": "string"
@@ -5690,6 +8110,28 @@
       "title": "Id",
       "type": "string"
      },
+     "last_login_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Login At"
+     },
+     "mfa_enabled": {
+      "default": false,
+      "title": "Mfa Enabled",
+      "type": "boolean"
+     },
+     "mfa_required": {
+      "default": false,
+      "title": "Mfa Required",
+      "type": "boolean"
+     },
      "organization": {
       "anyOf": [
        {
@@ -5699,6 +8141,28 @@
         "type": "null"
        }
       ]
+     },
+     "partner_role": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Partner Role"
+     },
+     "phone": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone"
      },
      "staff_role": {
       "anyOf": [
@@ -5718,7 +8182,8 @@
      "id",
      "email",
      "full_name",
-     "user_type"
+     "user_type",
+     "account_status"
     ],
     "title": "MeOut",
     "type": "object"
@@ -5768,7 +8233,7 @@
     "description": "Request only: a meeting is confirmed later by staff after a real availability check.",
     "properties": {
      "business_email": {
-      "format": "email",
+      "maxLength": 254,
       "title": "Business Email",
       "type": "string"
      },
@@ -5881,6 +8346,30 @@
      "code"
     ],
     "title": "MfaCodeIn",
+    "type": "object"
+   },
+   "MfaDisableIn": {
+    "additionalProperties": false,
+    "properties": {
+     "code": {
+      "maxLength": 6,
+      "minLength": 6,
+      "pattern": "^[0-9]{6}$",
+      "title": "Code",
+      "type": "string"
+     },
+     "password": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Password",
+      "type": "string"
+     }
+    },
+    "required": [
+     "password",
+     "code"
+    ],
+    "title": "MfaDisableIn",
     "type": "object"
    },
    "MfaEnrollOut": {
@@ -6104,6 +8593,54 @@
     "title": "OptionalNoteIn",
     "type": "object"
    },
+   "OrgActivityRow": {
+    "properties": {
+     "action": {
+      "title": "Action",
+      "type": "string"
+     },
+     "actor_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Actor Name"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "meta": {
+      "additionalProperties": true,
+      "title": "Meta",
+      "type": "object"
+     },
+     "record_type": {
+      "title": "Record Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "record_type",
+     "action",
+     "actor_name",
+     "meta",
+     "created_at"
+    ],
+    "title": "OrgActivityRow",
+    "type": "object"
+   },
    "OrgRefOut": {
     "properties": {
      "id": {
@@ -6221,6 +8758,63 @@
      "reason"
     ],
     "title": "OrgStatusIn",
+    "type": "object"
+   },
+   "OrganizationApplicationOut": {
+    "properties": {
+     "assigned_reviewer_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Assigned Reviewer Id"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "reference": {
+      "title": "Reference",
+      "type": "string"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "reference",
+     "status",
+     "assigned_reviewer_id"
+    ],
+    "title": "OrganizationApplicationOut",
+    "type": "object"
+   },
+   "OrganizationDetailOut": {
+    "properties": {
+     "applications": {
+      "items": {
+       "$ref": "#/components/schemas/OrganizationApplicationOut"
+      },
+      "title": "Applications",
+      "type": "array"
+     },
+     "profile": {
+      "$ref": "#/components/schemas/OrganizationProfileOut"
+     }
+    },
+    "required": [
+     "profile",
+     "applications"
+    ],
+    "title": "OrganizationDetailOut",
     "type": "object"
    },
    "OrganizationOut": {
@@ -6419,6 +9013,175 @@
     "title": "OrganizationOut",
     "type": "object"
    },
+   "OrganizationProfileOut": {
+    "properties": {
+     "annual_turnover_inr_crore": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Annual Turnover Inr Crore"
+     },
+     "authorized_contacts": {
+      "anyOf": [
+       {
+        "items": {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorized Contacts"
+     },
+     "business_description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Business Description"
+     },
+     "client_references": {
+      "anyOf": [
+       {
+        "items": {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Client References"
+     },
+     "country": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Country"
+     },
+     "employee_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Employee Count"
+     },
+     "legal_name": {
+      "title": "Legal Name",
+      "type": "string"
+     },
+     "registered_address": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Registered Address"
+     },
+     "registration_number": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Registration Number"
+     },
+     "service_categories": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Service Categories"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "technical_capabilities": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Technical Capabilities"
+     },
+     "website": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Website"
+     },
+     "year_established": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Year Established"
+     }
+    },
+    "required": [
+     "legal_name",
+     "status",
+     "year_established",
+     "employee_count",
+     "registered_address",
+     "country",
+     "website",
+     "service_categories",
+     "technical_capabilities",
+     "business_description"
+    ],
+    "title": "OrganizationProfileOut",
+    "type": "object"
+   },
    "OrganizationRef": {
     "properties": {
      "id": {
@@ -6438,12 +9201,122 @@
     "title": "OrganizationRef",
     "type": "object"
    },
+   "OverviewActivityOut": {
+    "properties": {
+     "action": {
+      "title": "Action",
+      "type": "string"
+     },
+     "actor_type": {
+      "title": "Actor Type",
+      "type": "string"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "record_type": {
+      "title": "Record Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "action",
+     "record_type",
+     "actor_type",
+     "created_at"
+    ],
+    "title": "OverviewActivityOut",
+    "type": "object"
+   },
+   "OverviewOut": {
+    "properties": {
+     "applications": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "type": "integer"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Applications"
+     },
+     "enquiries": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Enquiries",
+      "type": "object"
+     },
+     "failed_notifications": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Failed Notifications"
+     },
+     "overdue_follow_ups": {
+      "title": "Overdue Follow Ups",
+      "type": "integer"
+     },
+     "recent_activity": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/OverviewActivityOut"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Recent Activity"
+     },
+     "sla_breached": {
+      "title": "Sla Breached",
+      "type": "integer"
+     },
+     "unassigned_applications": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Unassigned Applications"
+     },
+     "unassigned_enquiries": {
+      "title": "Unassigned Enquiries",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "enquiries",
+     "unassigned_enquiries",
+     "overdue_follow_ups",
+     "sla_breached"
+    ],
+    "title": "OverviewOut",
+    "type": "object"
+   },
    "PartnerApplicationIn": {
     "additionalProperties": false,
     "description": "Values are recorded for human review. They never trigger approval or rejection.",
     "properties": {
      "business_email": {
-      "format": "email",
+      "maxLength": 254,
       "title": "Business Email",
       "type": "string"
      },
@@ -6608,6 +9481,101 @@
     "title": "PartnerDocCategory",
     "type": "string"
    },
+   "PartnerDocumentRequestOut": {
+    "properties": {
+     "application_reference": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Application Reference"
+     },
+     "category": {
+      "$ref": "#/components/schemas/PartnerDocCategory"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "due_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Due At"
+     },
+     "fulfilled_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fulfilled At"
+     },
+     "fulfilled_document_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fulfilled Document Id"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "is_overdue": {
+      "title": "Is Overdue",
+      "type": "boolean"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "status": {
+      "enum": [
+       "open",
+       "fulfilled",
+       "cancelled"
+      ],
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "application_reference",
+     "category",
+     "note",
+     "due_at",
+     "status",
+     "is_overdue",
+     "fulfilled_document_id",
+     "fulfilled_at",
+     "created_at"
+    ],
+    "title": "PartnerDocumentRequestOut",
+    "type": "object"
+   },
    "PartnerEnquiryOut": {
     "properties": {
      "enquiry_type": {
@@ -6761,6 +9729,10 @@
    },
    "PartnerNotificationOut": {
     "properties": {
+     "category": {
+      "title": "Category",
+      "type": "string"
+     },
      "created_at": {
       "format": "date-time",
       "title": "Created At",
@@ -6791,20 +9763,115 @@
       ],
       "title": "Read At"
      },
+     "related_reference": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Related Reference"
+     },
      "template": {
       "title": "Template",
+      "type": "string"
+     },
+     "title": {
+      "title": "Title",
       "type": "string"
      }
     },
     "required": [
      "id",
      "template",
+     "title",
+     "category",
+     "related_reference",
      "delivery_status",
      "created_at",
      "read_at",
      "is_read"
     ],
     "title": "PartnerNotificationOut",
+    "type": "object"
+   },
+   "PartnerPrivacyRequestIn": {
+    "additionalProperties": false,
+    "description": "Identity (email, account) comes from the session; the body only says what is wanted.",
+    "properties": {
+     "details": {
+      "anyOf": [
+       {
+        "maxLength": 2000,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Details"
+     },
+     "kind": {
+      "$ref": "#/components/schemas/PrivacyRequestKind"
+     }
+    },
+    "required": [
+     "kind"
+    ],
+    "title": "PartnerPrivacyRequestIn",
+    "type": "object"
+   },
+   "PartnerPrivacyRequestOut": {
+    "properties": {
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "details": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Details"
+     },
+     "kind": {
+      "$ref": "#/components/schemas/PrivacyRequestKind"
+     },
+     "reference": {
+      "title": "Reference",
+      "type": "string"
+     },
+     "resolution_note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Resolution Note"
+     },
+     "status": {
+      "$ref": "#/components/schemas/PrivacyRequestStatus"
+     }
+    },
+    "required": [
+     "reference",
+     "kind",
+     "status",
+     "details",
+     "resolution_note",
+     "created_at"
+    ],
+    "title": "PartnerPrivacyRequestOut",
     "type": "object"
    },
    "PasswordResetConfirmIn": {
@@ -6834,7 +9901,7 @@
     "additionalProperties": false,
     "properties": {
      "email": {
-      "format": "email",
+      "maxLength": 254,
       "title": "Email",
       "type": "string"
      }
@@ -6934,6 +10001,11 @@
       "title": "Email",
       "type": "string"
      },
+     "email_verified": {
+      "default": false,
+      "title": "Email Verified",
+      "type": "boolean"
+     },
      "id": {
       "format": "uuid",
       "title": "Id",
@@ -6959,6 +10031,11 @@
      },
      "status": {
       "$ref": "#/components/schemas/PrivacyRequestStatus"
+     },
+     "submitted_by_partner": {
+      "default": false,
+      "title": "Submitted By Partner",
+      "type": "boolean"
      }
     },
     "required": [
@@ -7008,6 +10085,22 @@
      "status"
     ],
     "title": "PrivacyUpdateIn",
+    "type": "object"
+   },
+   "PrivacyVerifyIn": {
+    "additionalProperties": false,
+    "properties": {
+     "token": {
+      "maxLength": 200,
+      "minLength": 10,
+      "title": "Token",
+      "type": "string"
+     }
+    },
+    "required": [
+     "token"
+    ],
+    "title": "PrivacyVerifyIn",
     "type": "object"
    },
    "ProfileUpdate": {
@@ -7216,6 +10309,39 @@
     "title": "ProfileUpdate",
     "type": "object"
    },
+   "ProfileUpdateIn": {
+    "additionalProperties": false,
+    "description": "Only the fields you send change. `phone` null clears it; the name cannot be cleared.",
+    "properties": {
+     "full_name": {
+      "anyOf": [
+       {
+        "maxLength": 150,
+        "minLength": 1,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Full Name"
+     },
+     "phone": {
+      "anyOf": [
+       {
+        "pattern": "^\\+[0-9]{7,15}$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone"
+     }
+    },
+    "title": "ProfileUpdateIn",
+    "type": "object"
+   },
    "ProjectCategory": {
     "enum": [
      "erp_implementation",
@@ -7240,7 +10366,7 @@
     "description": "Business-level requirement only. Do NOT include patient, health or bank-account data.",
     "properties": {
      "business_email": {
-      "format": "email",
+      "maxLength": 254,
       "title": "Business Email",
       "type": "string"
      },
@@ -7390,6 +10516,19 @@
        }
       ]
      },
+     "canonical_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://[^\\s<>\\\"']+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Canonical Url"
+     },
      "category": {
       "anyOf": [
        {
@@ -7404,6 +10543,31 @@
      "content_type": {
       "$ref": "#/components/schemas/ContentType"
      },
+     "image_alt": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Image Alt"
+     },
+     "image_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://[^\\s<>\\\"']+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Image Url"
+     },
      "last_reviewed_at": {
       "anyOf": [
        {
@@ -7416,6 +10580,43 @@
       ],
       "title": "Last Reviewed At"
      },
+     "og_description": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Og Description"
+     },
+     "og_image_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://[^\\s<>\\\"']+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Og Image Url"
+     },
+     "og_title": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Og Title"
+     },
      "published_at": {
       "anyOf": [
        {
@@ -7427,6 +10628,30 @@
        }
       ],
       "title": "Published At"
+     },
+     "seo_description": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Seo Description"
+     },
+     "seo_title": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Seo Title"
      },
      "slug": {
       "title": "Slug",
@@ -7485,6 +10710,19 @@
       "title": "Body",
       "type": "string"
      },
+     "canonical_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://[^\\s<>\\\"']+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Canonical Url"
+     },
      "category": {
       "anyOf": [
        {
@@ -7499,6 +10737,31 @@
      "content_type": {
       "$ref": "#/components/schemas/ContentType"
      },
+     "image_alt": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Image Alt"
+     },
+     "image_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://[^\\s<>\\\"']+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Image Url"
+     },
      "last_reviewed_at": {
       "anyOf": [
        {
@@ -7510,6 +10773,43 @@
        }
       ],
       "title": "Last Reviewed At"
+     },
+     "og_description": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Og Description"
+     },
+     "og_image_url": {
+      "anyOf": [
+       {
+        "maxLength": 500,
+        "pattern": "^https://[^\\s<>\\\"']+$",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Og Image Url"
+     },
+     "og_title": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Og Title"
      },
      "published_at": {
       "anyOf": [
@@ -7529,6 +10829,30 @@
       },
       "title": "Related",
       "type": "array"
+     },
+     "seo_description": {
+      "anyOf": [
+       {
+        "maxLength": 300,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Seo Description"
+     },
+     "seo_title": {
+      "anyOf": [
+       {
+        "maxLength": 200,
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Seo Title"
      },
      "slug": {
       "title": "Slug",
@@ -7672,6 +10996,43 @@
      "refresh_token"
     ],
     "title": "RefreshIn",
+    "type": "object"
+   },
+   "ReportCountOut": {
+    "properties": {
+     "count": {
+      "title": "Count",
+      "type": "integer"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     }
+    },
+    "required": [
+     "key",
+     "count"
+    ],
+    "title": "ReportCountOut",
+    "type": "object"
+   },
+   "ReportPeriodCountOut": {
+    "properties": {
+     "count": {
+      "title": "Count",
+      "type": "integer"
+     },
+     "period": {
+      "format": "date-time",
+      "title": "Period",
+      "type": "string"
+     }
+    },
+    "required": [
+     "period",
+     "count"
+    ],
+    "title": "ReportPeriodCountOut",
     "type": "object"
    },
    "RespondIn": {
@@ -7983,6 +11344,64 @@
     "title": "RevisionOut",
     "type": "object"
    },
+   "RevisionRow": {
+    "properties": {
+     "changed_by": {
+      "format": "uuid",
+      "title": "Changed By",
+      "type": "string"
+     },
+     "changed_by_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Changed By Name"
+     },
+     "changes": {
+      "additionalProperties": true,
+      "title": "Changes",
+      "type": "object"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "version": {
+      "title": "Version",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "version",
+     "changed_by",
+     "changed_by_name",
+     "changes",
+     "created_at"
+    ],
+    "title": "RevisionRow",
+    "type": "object"
+   },
+   "ScheduleIn": {
+    "additionalProperties": false,
+    "properties": {
+     "publish_at": {
+      "format": "date-time",
+      "title": "Publish At",
+      "type": "string"
+     }
+    },
+    "required": [
+     "publish_at"
+    ],
+    "title": "ScheduleIn",
+    "type": "object"
+   },
    "SecurityPolicyOut": {
     "description": "Read-only effective policy. Values come from deployment configuration, never secrets.",
     "properties": {
@@ -8120,6 +11539,18 @@
      "current": {
       "title": "Current",
       "type": "boolean"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
      },
      "id": {
       "format": "uuid",
@@ -8268,6 +11699,126 @@
      "end"
     ],
     "title": "Slot",
+    "type": "object"
+   },
+   "StaffDocumentRequestOut": {
+    "properties": {
+     "application_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Application Id"
+     },
+     "application_reference": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Application Reference"
+     },
+     "category": {
+      "$ref": "#/components/schemas/PartnerDocCategory"
+     },
+     "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+     },
+     "created_by_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Created By Name"
+     },
+     "due_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Due At"
+     },
+     "fulfilled_at": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fulfilled At"
+     },
+     "fulfilled_document_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fulfilled Document Id"
+     },
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "is_overdue": {
+      "title": "Is Overdue",
+      "type": "boolean"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     },
+     "status": {
+      "enum": [
+       "open",
+       "fulfilled",
+       "cancelled"
+      ],
+      "title": "Status",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "application_reference",
+     "category",
+     "note",
+     "due_at",
+     "status",
+     "is_overdue",
+     "fulfilled_document_id",
+     "fulfilled_at",
+     "created_at",
+     "application_id",
+     "created_by_name"
+    ],
+    "title": "StaffDocumentRequestOut",
     "type": "object"
    },
    "StaffInviteIn": {
@@ -8439,7 +11990,7 @@
       "type": "boolean"
      },
      "business_email": {
-      "format": "email",
+      "maxLength": 254,
       "title": "Business Email",
       "type": "string"
      },
@@ -8694,6 +12245,19 @@
     "title": "TemplateOut",
     "type": "object"
    },
+   "TemplatePlaceholderOut": {
+    "properties": {
+     "name": {
+      "title": "Name",
+      "type": "string"
+     }
+    },
+    "required": [
+     "name"
+    ],
+    "title": "TemplatePlaceholderOut",
+    "type": "object"
+   },
    "TokenOut": {
     "properties": {
      "access_token": {
@@ -8921,6 +12485,97 @@
     ],
     "title": "WorkforceRange",
     "type": "string"
+   },
+   "WorkloadOut": {
+    "properties": {
+     "rows": {
+      "items": {
+       "$ref": "#/components/schemas/WorkloadRow"
+      },
+      "title": "Rows",
+      "type": "array"
+     },
+     "totals": {
+      "$ref": "#/components/schemas/WorkloadTotals"
+     }
+    },
+    "required": [
+     "rows",
+     "totals"
+    ],
+    "title": "WorkloadOut",
+    "type": "object"
+   },
+   "WorkloadRow": {
+    "properties": {
+     "assignee_id": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Assignee Id"
+     },
+     "assignee_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Assignee Name"
+     },
+     "open_enquiries": {
+      "title": "Open Enquiries",
+      "type": "integer"
+     },
+     "overdue_follow_ups": {
+      "title": "Overdue Follow Ups",
+      "type": "integer"
+     },
+     "sla_breached": {
+      "title": "Sla Breached",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "assignee_id",
+     "assignee_name",
+     "open_enquiries",
+     "overdue_follow_ups",
+     "sla_breached"
+    ],
+    "title": "WorkloadRow",
+    "type": "object"
+   },
+   "WorkloadTotals": {
+    "properties": {
+     "open_enquiries": {
+      "title": "Open Enquiries",
+      "type": "integer"
+     },
+     "overdue_follow_ups": {
+      "title": "Overdue Follow Ups",
+      "type": "integer"
+     },
+     "sla_breached": {
+      "title": "Sla Breached",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "open_enquiries",
+     "overdue_follow_ups",
+     "sla_breached"
+    ],
+    "title": "WorkloadTotals",
+    "type": "object"
    },
    "app__common__responses__ApiResponse_DocumentOut___1": {
     "properties": {
@@ -9208,6 +12863,18 @@
    },
    "app__modules__partner_documents__schemas__DocumentOut": {
     "properties": {
+     "can_download": {
+      "title": "Can Download",
+      "type": "boolean"
+     },
+     "can_remove": {
+      "title": "Can Remove",
+      "type": "boolean"
+     },
+     "can_replace": {
+      "title": "Can Replace",
+      "type": "boolean"
+     },
      "category": {
       "$ref": "#/components/schemas/PartnerDocCategory"
      },
@@ -9235,7 +12902,10 @@
      "id",
      "category",
      "status",
-     "current_version"
+     "current_version",
+     "can_replace",
+     "can_remove",
+     "can_download"
     ],
     "title": "DocumentOut",
     "type": "object"
@@ -9589,6 +13259,62 @@
      }
     ],
     "summary": "All staff and partner accounts with invitation state (super administrator)",
+    "tags": [
+     "admin-accounts"
+    ]
+   }
+  },
+  "/api/v1/admin/accounts/metrics": {
+   "get": {
+    "operationId": "account_metrics_api_v1_admin_accounts_metrics_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_AccountMetricsOut_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Account counts by type, status and staff role (super administrator)",
     "tags": [
      "admin-accounts"
     ]
@@ -10375,6 +14101,380 @@
      }
     ],
     "summary": "Audit log (super administrator)",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
+  "/api/v1/admin/audit.csv": {
+   "get": {
+    "operationId": "export_audit_api_v1_admin_audit_csv_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "record_type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 50,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Record Type"
+      }
+     },
+     {
+      "in": "query",
+      "name": "action",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 80,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Action"
+      }
+     },
+     {
+      "in": "query",
+      "name": "actor_user_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Actor User Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "organization_id",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "uuid",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Organization Id"
+      }
+     },
+     {
+      "in": "query",
+      "name": "created_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date-time",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Created From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "created_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date-time",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Created To"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "maxLength": 80,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+       "default": "-created_at",
+       "enum": [
+        "created_at",
+        "-created_at"
+       ],
+       "title": "Sort",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       },
+       "text/csv": {}
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Export the filtered audit log as formula-safe CSV (super administrator)",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
+  "/api/v1/admin/audit/actions": {
+   "get": {
+    "operationId": "audit_actions_api_v1_admin_audit_actions_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_list_str__"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List event actions currently present in the audit log",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
+  "/api/v1/admin/audit/{activity_id}": {
+   "get": {
+    "operationId": "audit_detail_api_v1_admin_audit__activity_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "activity_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Activity Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_AuditRow_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Get one audit event by id (super administrator)",
     "tags": [
      "admin"
     ]
@@ -11741,6 +15841,190 @@
     ]
    }
   },
+  "/api/v1/admin/content/{item_id}/schedule": {
+   "delete": {
+    "operationId": "cancel_scheduled_publish_api_v1_admin_content__item_id__schedule_delete",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "item_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Item Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_AdminContent_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Cancel a scheduled publication",
+    "tags": [
+     "admin-content"
+    ]
+   },
+   "post": {
+    "operationId": "schedule_publish_api_v1_admin_content__item_id__schedule_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "item_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Item Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ScheduleIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_AdminContent_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Schedule approved, claims-cleared content for future publication",
+    "tags": [
+     "admin-content"
+    ]
+   }
+  },
   "/api/v1/admin/content/{item_id}/submit": {
    "post": {
     "operationId": "submit_api_v1_admin_content__item_id__submit_post",
@@ -12252,6 +16536,107 @@
     ]
    }
   },
+  "/api/v1/admin/documents/{document_id}/history": {
+   "get": {
+    "operationId": "document_review_history_api_v1_admin_documents__document_id__history_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "document_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Document Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "minimum": 1,
+       "title": "Page",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page_size",
+      "required": false,
+      "schema": {
+       "default": 20,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Page Size",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_list_DocumentReviewHistoryRow__"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Document versions and their staff review outcomes",
+    "tags": [
+     "admin-reference"
+    ]
+   }
+  },
   "/api/v1/admin/enquiries": {
    "get": {
     "operationId": "list_enquiries_api_v1_admin_enquiries_get",
@@ -12459,6 +16844,22 @@
        ],
        "description": "Project category",
        "title": "Category"
+      }
+     },
+     {
+      "in": "query",
+      "name": "discussion_type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "$ref": "#/components/schemas/DiscussionType"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Discussion Type"
       }
      },
      {
@@ -13019,6 +17420,117 @@
     ]
    }
   },
+  "/api/v1/admin/enquiries/{enquiry_id}/documents": {
+   "get": {
+    "operationId": "enquiry_documents_api_v1_admin_enquiries__enquiry_id__documents_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "enquiry_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Enquiry Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "minimum": 1,
+       "title": "Page",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page_size",
+      "required": false,
+      "schema": {
+       "default": 20,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Page Size",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_list_EnquiryDocumentOut__"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List enquiry attachments (financial attachments are super-admin only)",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
   "/api/v1/admin/enquiries/{enquiry_id}/documents/{document_id}/download": {
    "get": {
     "operationId": "download_api_v1_admin_enquiries__enquiry_id__documents__document_id__download_get",
@@ -13515,6 +18027,331 @@
     "summary": "Complete Followup",
     "tags": [
      "admin"
+    ]
+   }
+  },
+  "/api/v1/admin/feed": {
+   "get": {
+    "operationId": "list_feed_api_v1_admin_feed_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "unread",
+      "required": false,
+      "schema": {
+       "default": false,
+       "title": "Unread",
+       "type": "boolean"
+      }
+     },
+     {
+      "description": "Show archived items instead",
+      "in": "query",
+      "name": "archived",
+      "required": false,
+      "schema": {
+       "default": false,
+       "description": "Show archived items instead",
+       "title": "Archived",
+       "type": "boolean"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "minimum": 1,
+       "title": "Page",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page_size",
+      "required": false,
+      "schema": {
+       "default": 20,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Page Size",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_list_FeedItemOut__"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Your own notification feed (meta.unread counts unread, non-archived items)",
+    "tags": [
+     "admin-feed"
+    ]
+   }
+  },
+  "/api/v1/admin/feed/read-all": {
+   "post": {
+    "operationId": "read_all_api_v1_admin_feed_read_all_post",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_dict_str__int__"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Mark all as read",
+    "tags": [
+     "admin-feed"
+    ]
+   }
+  },
+  "/api/v1/admin/feed/{item_id}/archive": {
+   "post": {
+    "operationId": "archive_api_v1_admin_feed__item_id__archive_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "item_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Item Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_FeedItemOut_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Archive one item",
+    "tags": [
+     "admin-feed"
+    ]
+   }
+  },
+  "/api/v1/admin/feed/{item_id}/read": {
+   "post": {
+    "operationId": "mark_read_api_v1_admin_feed__item_id__read_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "item_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Item Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_FeedItemOut_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Mark one as read",
+    "tags": [
+     "admin-feed"
     ]
    }
   },
@@ -14209,6 +19046,82 @@
      }
     ],
     "summary": "All template keys; customised ones include their text",
+    "tags": [
+     "admin-operations"
+    ]
+   }
+  },
+  "/api/v1/admin/notification-templates/placeholders": {
+   "get": {
+    "operationId": "list_template_placeholders_api_v1_admin_notification_templates_placeholders_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_list_TemplatePlaceholderOut__"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "List placeholders accepted by notification templates",
     "tags": [
      "admin-operations"
     ]
@@ -15083,7 +19996,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/ApiResponse_dict_str__Any__"
+         "$ref": "#/components/schemas/ApiResponse_OrganizationDetailOut_"
         }
        }
       },
@@ -15148,6 +20061,208 @@
     "summary": "Organization profile + applications (financial data: super administrators only)",
     "tags": [
      "admin"
+    ]
+   }
+  },
+  "/api/v1/admin/organizations/{org_id}/activity": {
+   "get": {
+    "operationId": "activity_api_v1_admin_organizations__org_id__activity_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "minimum": 1,
+       "title": "Page",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page_size",
+      "required": false,
+      "schema": {
+       "default": 20,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Page Size",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_list_OrgActivityRow__"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Audit trail of one organisation (strategic enquiry events are never included)",
+    "tags": [
+     "admin-organizations"
+    ]
+   }
+  },
+  "/api/v1/admin/organizations/{org_id}/revisions": {
+   "get": {
+    "operationId": "revisions_api_v1_admin_organizations__org_id__revisions_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "org_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Org Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "minimum": 1,
+       "title": "Page",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page_size",
+      "required": false,
+      "schema": {
+       "default": 20,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Page Size",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_list_RevisionRow__"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Profile revisions of an organisation with before/after values and who changed them",
+    "tags": [
+     "admin-organizations"
     ]
    }
   },
@@ -15257,7 +20372,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/ApiResponse_dict_str__Any__"
+         "$ref": "#/components/schemas/ApiResponse_OverviewOut_"
         }
        }
       },
@@ -15999,6 +21114,230 @@
     ]
    }
   },
+  "/api/v1/admin/reports/communications": {
+   "get": {
+    "operationId": "communication_report_api_v1_admin_reports_communications_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "created_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date-time",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Created From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "created_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date-time",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Created To"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_CommunicationReportOut_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Email outbox counts by delivery status and template",
+    "tags": [
+     "admin-operations"
+    ]
+   }
+  },
+  "/api/v1/admin/reports/document-review": {
+   "get": {
+    "operationId": "document_review_report_api_v1_admin_reports_document_review_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "created_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date-time",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Created From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "created_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date-time",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Created To"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_DocumentReviewReportOut_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Partner document version review counts and observed average turnaround",
+    "tags": [
+     "admin-operations"
+    ]
+   }
+  },
   "/api/v1/admin/reports/enquiries.csv": {
    "get": {
     "operationId": "export_enquiries_api_v1_admin_reports_enquiries_csv_get",
@@ -16187,6 +21526,22 @@
      },
      {
       "in": "query",
+      "name": "discussion_type",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "$ref": "#/components/schemas/DiscussionType"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Discussion Type"
+      }
+     },
+     {
+      "in": "query",
       "name": "project_group",
       "required": false,
       "schema": {
@@ -16330,6 +21685,118 @@
     ]
    }
   },
+  "/api/v1/admin/reports/follow-ups": {
+   "get": {
+    "operationId": "follow_up_report_api_v1_admin_reports_follow_ups_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "created_from",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date-time",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Created From"
+      }
+     },
+     {
+      "in": "query",
+      "name": "created_to",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "format": "date-time",
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Created To"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_FollowUpReportOut_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Follow-up counts by kind and open/completed/cancelled state",
+    "tags": [
+     "admin-operations"
+    ]
+   }
+  },
   "/api/v1/admin/reports/kpis": {
    "get": {
     "operationId": "kpis_api_v1_admin_reports_kpis_get",
@@ -16374,7 +21841,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/ApiResponse_dict_str__Any__"
+         "$ref": "#/components/schemas/ApiResponse_KpisOut_"
         }
        }
       },
@@ -17455,6 +22922,82 @@
     ]
    }
   },
+  "/api/v1/admin/workload": {
+   "get": {
+    "operationId": "workload_api_v1_admin_workload_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_WorkloadOut_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Open enquiry workload counts by assignee (no capacity limits)",
+    "tags": [
+     "admin"
+    ]
+   }
+  },
   "/api/v1/auth/change-password": {
    "post": {
     "operationId": "change_password_api_v1_auth_change_password_post",
@@ -17724,6 +23267,70 @@
     "tags": [
      "auth"
     ]
+   },
+   "patch": {
+    "operationId": "update_my_profile_api_v1_auth_me_patch",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProfileUpdateIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_MeOut_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Too Many Requests"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Update your own name and phone (staff and partners); audited",
+    "tags": [
+     "auth"
+    ]
    }
   },
   "/api/v1/auth/mfa/confirm": {
@@ -17797,6 +23404,92 @@
      }
     ],
     "summary": "Confirm enrollment with the first code; returns recovery codes once",
+    "tags": [
+     "auth"
+    ]
+   }
+  },
+  "/api/v1/auth/mfa/disable": {
+   "post": {
+    "operationId": "mfa_disable_api_v1_auth_mfa_disable_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MfaDisableIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_NoneType_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Too Many Requests"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Turn MFA off (partner accounts only; password and a current code required)",
     "tags": [
      "auth"
     ]
@@ -18200,6 +23893,50 @@
    }
   },
   "/api/v1/auth/sessions": {
+   "delete": {
+    "operationId": "revoke_other_sessions_api_v1_auth_sessions_delete",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_dict_str__int__"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Too Many Requests"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Sign out every other session of your account",
+    "tags": [
+     "auth"
+    ]
+   },
    "get": {
     "operationId": "list_sessions_api_v1_auth_sessions_get",
     "responses": {
@@ -20528,6 +26265,216 @@
     ]
    }
   },
+  "/api/v1/partner/document-requests": {
+   "get": {
+    "operationId": "my_requests_api_v1_partner_document_requests_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "open",
+          "fulfilled",
+          "cancelled"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "minimum": 1,
+       "title": "Page",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page_size",
+      "required": false,
+      "schema": {
+       "default": 20,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Page Size",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_list_PartnerDocumentRequestOut__"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Document requests for your organisation (meta.open counts open ones)",
+    "tags": [
+     "document-requests"
+    ]
+   }
+  },
+  "/api/v1/partner/document-requests/{request_id}": {
+   "get": {
+    "operationId": "my_request_api_v1_partner_document_requests__request_id__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "request_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Request Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_PartnerDocumentRequestOut_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "One document request (other organisations' ids return 404)",
+    "tags": [
+     "document-requests"
+    ]
+   }
+  },
   "/api/v1/partner/documents": {
    "get": {
     "operationId": "list_own_api_v1_partner_documents_get",
@@ -21478,6 +27425,82 @@
     ]
    }
   },
+  "/api/v1/partner/notifications/unread-count": {
+   "get": {
+    "operationId": "unread_count_api_v1_partner_notifications_unread_count_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_dict_str__int__"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Number of unread messages",
+    "tags": [
+     "partner-dashboard"
+    ]
+   }
+  },
   "/api/v1/partner/notifications/{notification_id}/read": {
    "post": {
     "operationId": "read_one_api_v1_partner_notifications__notification_id__read_post",
@@ -21561,6 +27584,94 @@
      }
     ],
     "summary": "Mark one message as read (only your own; others are 404)",
+    "tags": [
+     "partner-dashboard"
+    ]
+   }
+  },
+  "/api/v1/partner/notifications/{notification_id}/unread": {
+   "post": {
+    "operationId": "mark_unread_api_v1_partner_notifications__notification_id__unread_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "notification_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Notification Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_PartnerNotificationOut_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Mark one message as unread again",
     "tags": [
      "partner-dashboard"
     ]
@@ -21893,6 +28004,52 @@
     ]
    }
   },
+  "/api/v1/partner/organization/editable-fields": {
+   "get": {
+    "operationId": "editable_fields_api_v1_partner_organization_editable_fields_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_list_EditableFieldOut__"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Profile fields and direct-update/null-clearing behavior",
+    "tags": [
+     "partner-organization"
+    ]
+   }
+  },
   "/api/v1/partner/organization/history": {
    "get": {
     "operationId": "get_history_api_v1_partner_organization_history_get",
@@ -21936,6 +28093,211 @@
     "summary": "Get History",
     "tags": [
      "partner-organization"
+    ]
+   }
+  },
+  "/api/v1/partner/privacy-requests": {
+   "get": {
+    "operationId": "my_privacy_requests_api_v1_partner_privacy_requests_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "minimum": 1,
+       "title": "Page",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page_size",
+      "required": false,
+      "schema": {
+       "default": 20,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Page Size",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_list_PartnerPrivacyRequestOut__"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Too Many Requests"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Your own privacy requests",
+    "tags": [
+     "partner-privacy"
+    ]
+   },
+   "post": {
+    "operationId": "partner_privacy_request_api_v1_partner_privacy_requests_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PartnerPrivacyRequestIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_PartnerPrivacyRequestOut_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Too Many Requests"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Submit a data access / correction / deletion request as the signed-in partner",
+    "tags": [
+     "partner-privacy"
     ]
    }
   },
@@ -22043,6 +28405,97 @@
      }
     },
     "summary": "Data access / correction / deletion request",
+    "tags": [
+     "engagement"
+    ]
+   }
+  },
+  "/api/v1/privacy/requests/verify": {
+   "post": {
+    "operationId": "privacy_verify_api_v1_privacy_requests_verify_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PrivacyVerifyIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_dict_str__str__"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Too Many Requests"
+     }
+    },
+    "summary": "Confirm the email address of a privacy request (link from the email, single use)",
     "tags": [
      "engagement"
     ]
@@ -22495,6 +28948,234 @@
     "summary": "Assign",
     "tags": [
      "reviewer"
+    ]
+   }
+  },
+  "/api/v1/reviewer/applications/{application_id}/document-requests": {
+   "get": {
+    "operationId": "list_for_application_api_v1_reviewer_applications__application_id__document_requests_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "application_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Application Id",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "status",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "open",
+          "fulfilled",
+          "cancelled"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+       "default": 1,
+       "minimum": 1,
+       "title": "Page",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "page_size",
+      "required": false,
+      "schema": {
+       "default": 20,
+       "maximum": 100,
+       "minimum": 1,
+       "title": "Page Size",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_list_StaffDocumentRequestOut__"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Document requests of one application",
+    "tags": [
+     "document-requests"
+    ]
+   },
+   "post": {
+    "operationId": "create_api_v1_reviewer_applications__application_id__document_requests_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "application_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Application Id",
+       "type": "string"
+      }
+     }
+    ],
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DocumentRequestIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_StaffDocumentRequestOut_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Ask the partner for an additional document, with an optional deadline",
+    "tags": [
+     "document-requests"
     ]
    }
   },
@@ -23457,6 +30138,94 @@
     "summary": "Move the application to another permitted stage",
     "tags": [
      "reviewer"
+    ]
+   }
+  },
+  "/api/v1/reviewer/document-requests/{request_id}/cancel": {
+   "post": {
+    "operationId": "cancel_api_v1_reviewer_document_requests__request_id__cancel_post",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "request_id",
+      "required": true,
+      "schema": {
+       "format": "uuid",
+       "title": "Request Id",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ApiResponse_StaffDocumentRequestOut_"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "401": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unauthorized"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Unprocessable Entity"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "summary": "Withdraw an open request",
+    "tags": [
+     "document-requests"
     ]
    }
   },

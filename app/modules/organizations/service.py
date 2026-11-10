@@ -89,7 +89,16 @@ def apply_profile_update(
     changes: dict[str, Any] = {}
     for field, new in data.model_dump(exclude_unset=True, exclude={"expected_version"}).items():
         if new is None:
-            continue  # clearing a field is not supported; omit it instead
+            if field == "legal_name":
+                raise AppError(
+                    "Legal name cannot be cleared", status_code=422, code="FIELD_NOT_CLEARABLE"
+                )
+            old_json = _jsonable(getattr(org, field))
+            if old_json is None:
+                continue
+            changes[field] = {"old": old_json, "new": None}
+            setattr(org, field, None)
+            continue
         new_json = _jsonable(new)
         old_json = _jsonable(getattr(org, field))
         if new_json == old_json:

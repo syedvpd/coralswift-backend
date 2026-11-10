@@ -17,7 +17,7 @@ Input: "Coral Swift - Backend Gaps (all sessions, Phase 1 to Phase 29)". Each it
 |---|---|---|---|
 | X1 | Pagination meta on every list | CLOSED-TESTED | `page,page_size,total,pages` on every paginated list; sweep test over all list endpoints `test_gap_lists.py::test_every_paginated_list_reports_page_total_and_pages`. Privacy-request and profile-change lists lacked it and were fixed. Small fixed lists are deliberately unpaginated (listed in the test and contract) |
 | X2 | Server-side search/sort/date on `/reviewer/applications`, `/admin/organizations`, `/admin/users`, `/admin/notifications`, `/admin/content`, `/admin/audit` | CLOSED-TESTED | all six: `test_gap_applications`, `test_gap_lists`, `test_gap_phase_a` (invalid sort/status values return 422) |
-| X3 | Typed schemas for overview, KPIs, settings, org detail, outbox rows, partner notification/enquiry rows, enquiry contact/company/details/documents | NOT CLOSED | typed now: settings, launch-readiness, security-policy, admin outbox rows, partner notification and enquiry rows, follow-ups, audit. **Still untyped dicts:** `/admin/overview`, `/admin/reports/kpis`, `/admin/organizations/{id}`, enquiry detail `contact/company/details/documents` |
+| X3 | Typed schemas for overview, KPIs, settings, org detail, outbox rows, partner notification/enquiry rows, enquiry contact/company/details/documents | IMPLEMENTED-UNTESTED | response models exist; OpenAPI 3.1.0 generated (147 paths, 259 schemas). Role-limited fields remain omitted by service authorization. Behavioral tests cannot run because local PostgreSQL/Docker is unavailable |
 | X4 | Updated-at and actor names | CLOSED-TESTED | enquiry rows (`updated_at`, `assigned_user_name`), follow-ups (`author_name`, `assignee_name`), enquiry activity, audit (`actor_name`), reviewer list/detail (`updated_at`, `assigned_reviewer_name`, history `actor_name`, notes `author_name`), accounts. `test_gap_enquiries`, `test_gap_phase_a`, `test_gap_applications` |
 | X5 | Transition tables / allowed-next states | NOT CLOSED | **applications: CLOSED-TESTED** (`GET /reviewer/transitions`, `allowed_next` on rows; `test_gap_applications`). **enquiries:** status can be set to any `EnquiryStatus`; restricting it and new statuses ("awaiting response") need a decision (D8) |
 | X6 | Strategic flag on audit/outbox/notification rows | CLOSED-TESTED | `is_strategic` on audit and outbox rows (`test_gap_phase_a`). Access control never relies on it |
@@ -47,7 +47,7 @@ Input: "Coral Swift - Backend Gaps (all sessions, Phase 1 to Phase 29)". Each it
 | P4.2 | Recent decisions (decision timestamp) | CLOSED-TESTED | `decided_at` on reviewer rows; `updated_at`; sort `-updated_at` |
 | P4.3 | Recent onboarding activity feed | NOT CLOSED | no feed endpoint; depends on the onboarding model (D10) |
 | P4.4 | Documents awaiting verification | CLOSED-TESTED | `GET /admin/documents?review_status=pending` (`test_gap_reference`) |
-| P4.5 | Keys of overview/KPIs undocumented | NOT CLOSED | still untyped (X3); keys are listed in the contract |
+| P4.5 | Keys of overview/KPIs undocumented | IMPLEMENTED-UNTESTED | `OverviewOut`/`KpisOut` and the frontend contract define the keys; behavior tests unverified |
 | P4.6 | Reviewer list totals/date filter | CLOSED-TESTED | `meta.total` + `submitted_from/to`, `updated_from/to` |
 
 ## Phase 5 - applications management
@@ -82,7 +82,7 @@ Input: "Coral Swift - Backend Gaps (all sessions, Phase 1 to Phase 29)". Each it
 |---|---|---|---|
 | P8.1 | Row fields (phone, category, updated, assignee name) | CLOSED-TESTED | `test_gap_enquiries` |
 | P8.2 | Filter by category / IT vs Non-IT, sort | CLOSED-TESTED | `category`, `project_group=it|non_it`, `sort`, `assigned_any`, `updated_from/to` |
-| P8.3 | Typed contact/company/details/documents | NOT CLOSED | X3 |
+| P8.3 | Typed contact/company/details/documents | IMPLEMENTED-UNTESTED | enquiry detail uses typed nested response schemas; behavior tests unverified |
 | P8.4 | Activity and assignment history | CLOSED-TESTED | `GET /admin/enquiries/{id}/activity?action=assign` |
 | P8.5 | Internal note vs follow-up vs communication | CLOSED-TESTED | `kind` = note / follow_up / communication; a note is not a response, a communication is |
 | P8.6 | Status workflow, extra statuses | BLOCKED-DECISION | D8 |
@@ -92,18 +92,18 @@ Input: "Coral Swift - Backend Gaps (all sessions, Phase 1 to Phase 29)". Each it
 | Id | Gap | Status | Evidence / reason |
 |---|---|---|---|
 | P9.1 | Staff read/list access for strategic | CLOSED-TESTED | super administrators only (D12 if BDM should see them); confidentiality tests |
-| P9.2 | Strategic category (`discussion_type`) on rows + filter | NOT CLOSED | `category` on rows is done; a `discussion_type` filter is not implemented |
+| P9.2 | Strategic category (`discussion_type`) on rows + filter | NOT CLOSED | `discussion_type` is implemented as an enum-validated filter on `/admin/enquiries`; role visibility still comes from the shared visible-enquiry query. Focused tests were added but not run because local PostgreSQL is unavailable |
 | P9.3 | Notes vs discussion vs follow-up types with visibility | CLOSED-TESTED | follow-up `kind`; strategic enquiries are visible to super administrators only |
 | P9.4 | Assessment outcome / decision endpoint, extra statuses | BLOCKED-DECISION | D8 |
 | P9.5 | Activity history, assignee names, sort, total | CLOSED-TESTED | P8 endpoints |
-| P9.6 | Typed objects | NOT CLOSED | X3 |
+| P9.6 | Typed objects | IMPLEMENTED-UNTESTED | strategic/enquiry detail uses typed nested response schemas; role restrictions unchanged; behavior tests unverified |
 | P9.7 | Strategic queue, owner, response target | CLOSED-EXISTING | settings `route.owner.strategic`, `route.backup.strategic`, `sla.strategic`, `escalation.email.strategic` (`test_section28`); values are D3 |
 
 ## Phase 10 - assignment
 | Id | Gap | Status | Evidence / reason |
 |---|---|---|---|
 | P10.1 | Assignment history | CLOSED-TESTED | enquiry activity feed; application history |
-| P10.2 | Workload/aggregate endpoint, capacity rules | NOT CLOSED | no workload endpoint; capacity rules are D13 |
+| P10.2 | Workload/aggregate endpoint, capacity rules | NOT CLOSED | `/admin/workload` reports open, overdue and SLA-breached enquiry counts by assignee. Capacity rules remain blocked on D13; endpoint test was added but not run because Docker Desktop/local PostgreSQL is unavailable |
 | P10.3 | Reviewer list owner/search/priority/date filters | CLOSED-TESTED | owner, search, dates done; applications have no priority/follow-up in the PRD (N/A for those two) |
 | P10.4 | Clear an application assignment | CLOSED-TESTED | `reviewer_id: null`; reviewer loses access (`test_gap_applications`) |
 | P10.5 | Staff list super-admin only | CLOSED-TESTED | `/admin/assignees` |
@@ -125,10 +125,10 @@ Input: "Coral Swift - Backend Gaps (all sessions, Phase 1 to Phase 29)". Each it
 | Id | Gap | Status | Evidence / reason |
 |---|---|---|---|
 | P12.1 | Admin document list/filter | CLOSED-TESTED | `GET /admin/documents` (reviewers scoped to assigned organisations) |
-| P12.2 | Staff view of per-document review history | NOT CLOSED | partner-side history exists; no staff endpoint |
+| P12.2 | Staff view of per-document review history | NOT CLOSED | `GET /admin/documents/{id}/history` returns paginated versions/review outcomes; reviewers are limited to assigned organisations. Test added but not run because Docker Desktop/local PostgreSQL is unavailable |
 | P12.3 | Admin upload/replace/delete | BLOCKED-DECISION | D17 (not in PRD; partners own their documents) |
 | P12.4 | Document-level notes | CLOSED-EXISTING | `review_comment` per version (`test_reviewer`) |
-| P12.5 | Enquiry-attachment list; onboarding documents | NOT CLOSED | attachments are inside enquiry detail; no separate list; onboarding D10 |
+| P12.5 | Enquiry-attachment list; onboarding documents | NOT CLOSED | `GET /admin/enquiries/{id}/documents` provides the paginated attachment list with existing financial-document role filtering; onboarding documents remain blocked on D10 |
 | P12.6 | "Replacement requested" status | BLOCKED-DECISION | D18 (uses `clarification_needed`) |
 | P12.7 | Malware scanning, retention, deletion | N/A-JUSTIFIED / BLOCKED-DECISION | X12, X13 |
 
@@ -139,7 +139,7 @@ Input: "Coral Swift - Backend Gaps (all sessions, Phase 1 to Phase 29)". Each it
 | P13.2 | Org rows: category/type, contact | CLOSED-TESTED / BLOCKED-DECISION | `primary_contact` done; organisation category/type is a profile-field decision (D20) |
 | P13.3 | Filters location, date, sort | CLOSED-TESTED | `country`, dates, `sort` |
 | P13.4 | Org activity history, agreements, relationship manager, metrics | NOT CLOSED | org activity feed not built; agreements/relationship manager are D21 |
-| P13.5 | Typed org detail; list meta | NOT CLOSED / CLOSED-TESTED | detail untyped (M5); meta done |
+| P13.5 | Typed org detail; list meta | IMPLEMENTED-UNTESTED / CLOSED-TESTED | organization detail uses typed profile/application schemas; list meta was already present; behavior tests unverified |
 
 ## Phase 14 - partner accounts
 | Id | Gap | Status | Evidence / reason |
@@ -149,7 +149,7 @@ Input: "Coral Swift - Backend Gaps (all sessions, Phase 1 to Phase 29)". Each it
 | P14.3 | Suspend / reactivate | CLOSED-TESTED | sessions revoked on suspend; self-suspend blocked |
 | P14.4 | Partner roles/permissions | CLOSED-TESTED / BLOCKED-DECISION | partner modules in `/auth/permissions`; owner/member membership roles exist; role-specific limits are D22 |
 | P14.5 | Admin-initiated password reset | CLOSED-TESTED | emails the holder a link; admins never see or set passwords |
-| P14.6 | Account history, filters, metrics | CLOSED-TESTED / NOT CLOSED | history (`recent_activity`) and filters done; account metrics beyond `portal_adoption` not built |
+| P14.6 | Account history, filters, metrics | CLOSED-TESTED / IMPLEMENTED-UNTESTED | history (`recent_activity`) and filters; `/admin/accounts/metrics` counts type, status, staff role, active partners and never-logged-in accounts; behavioral tests added but not run (local PostgreSQL unavailable) |
 | P14.7 | "Already has an account" read | BLOCKED-DECISION | D2 (account enumeration) |
 
 ## Phase 15 - communication and notifications
@@ -159,16 +159,16 @@ Input: "Coral Swift - Backend Gaps (all sessions, Phase 1 to Phase 29)". Each it
 | P15.2 | Ad-hoc email, attachments, preferences | BLOCKED-DECISION | D15 |
 | P15.3 | Communication history by record | CLOSED-TESTED | follow-ups `kind=communication` + activity feed |
 | P15.4 | Delivered/opened receipts | BLOCKED-EXTERNAL | needs Brevo webhooks and a verified domain |
-| P15.5 | Template create/activate/versions/placeholder list | NOT CLOSED | overrides with an allow-list exist (`test_ops`); versioning and a placeholder list endpoint are not built |
+| P15.5 | Template create/activate/versions/placeholder list | PARTIAL / IMPLEMENTED-UNTESTED | overrides and incrementing versions exist; `/admin/notification-templates/placeholders` exposes the validator's allowed keys; focused role/shape assertions added but not run (local PostgreSQL unavailable) |
 | P15.6 | Outbox filters and typed rows | CLOSED-TESTED | status, template, q, dates, sort; typed |
 
 ## Phase 16 - CMS
 | Id | Gap | Status | Evidence / reason |
 |---|---|---|---|
 | P16.1 | Homepage/hero/banners/services/menus | BLOCKED-DECISION | D23 (content model not specified) |
-| P16.2 | Media library and image upload | NOT CLOSED | only a single attachment per item exists |
-| P16.3 | SEO fields | NOT CLOSED | not implemented |
-| P16.4 | Scheduled publication; category filter; sort | NOT CLOSED / CLOSED-TESTED | sort and date range done; scheduled publication not built |
+| P16.2 | Media library and image upload | BLOCKED-DECISION | D23 must define the content/media model before a media library is added; current content attachment is a single downloadable document |
+| P16.3 | SEO fields | N/A-JUSTIFIED | PRD 1.25 and traceability R-071 classify SEO metadata as frontend; backend already exposes a sitemap with published slugs and last-modified times |
+| P16.4 | Scheduled publication; category filter; sort | IMPLEMENTED-UNTESTED / CLOSED-TESTED | category/sort/date filters exist; approved content can be scheduled/cancelled; maintenance publishes due content only while claim gates remain clear; dry run includes due eligible count. Migration `0012`; tests added but not run because local DB is unavailable |
 | P16.5 | "Unpublished" status; audit history; owner | CLOSED-EXISTING | unpublish endpoint, version history; owner field not added |
 | P16.6 | Rich text | BLOCKED-DECISION | D23 |
 | P16.7 | Content Administrator permissions | CLOSED-TESTED | visible in the permission matrix; approval needs a super administrator (D24) |
@@ -177,7 +177,7 @@ Input: "Coral Swift - Backend Gaps (all sessions, Phase 1 to Phase 29)". Each it
 | Id | Gap | Status | Evidence / reason |
 |---|---|---|---|
 | P17.1 | Get by id, search, pagination | CLOSED-TESTED | `/admin/users` (q, status, sort, meta), `/admin/accounts/{id}` |
-| P17.2 | Profile update; contact fields | NOT CLOSED | name/email change not built |
+| P17.2 | Profile update; contact fields | PARTIAL / IMPLEMENTED-UNTESTED | authenticated staff can PATCH `/auth/me` full name; email change remains unsupported because no verified-change flow exists; focused scope/audit test added but not run (local PostgreSQL unavailable) |
 | P17.3 | Permission matrix; editing | CLOSED-TESTED / BLOCKED-DECISION | view done; editing permissions D25 |
 | P17.4 | Suspend/reactivate; admin reset; invitation list/resend | CLOSED-TESTED | accounts endpoints |
 | P17.5 | Dates; per-user activity; typed status | CLOSED-TESTED | |
@@ -188,17 +188,17 @@ Input: "Coral Swift - Backend Gaps (all sessions, Phase 1 to Phase 29)". Each it
 |---|---|---|---|
 | P18.1 | Date filters on applications / partners / outbox | CLOSED-TESTED | |
 | P18.2 | Assignee/category filters; IT/Non-IT | CLOSED-TESTED | |
-| P18.3 | Turnaround, onboarding, document KPIs | NOT CLOSED | document review turnaround exists; onboarding KPIs depend on D10 |
-| P18.4 | Partner-account metrics, follow-up trends | NOT CLOSED | `portal_adoption` and follow-up counts exist; trends not built |
-| P18.5 | Document-review / communication reports | NOT CLOSED | |
+| P18.3 | Turnaround, onboarding, document KPIs | PARTIAL | document-review turnaround KPI exists; onboarding KPIs remain blocked on D10 |
+| P18.4 | Partner-account metrics, follow-up trends | IMPLEMENTED-UNTESTED | account metrics implemented; `/admin/reports/follow-ups` reports counts by kind/status and monthly time series, filtered to the caller's visible enquiry types |
+| P18.5 | Document-review / communication reports | IMPLEMENTED-UNTESTED | super-admin aggregate reports by document review state/observed turnaround and notification delivery status/template; focused role/shape tests added, not run because local DB unavailable |
 | P18.6 | PDF / Excel export, CSV titles | BLOCKED-DECISION | D26 (optional per PRD; CSV only today) |
-| P18.7 | Typed KPI/overview totals | NOT CLOSED | X3 |
+| P18.7 | Typed KPI/overview totals | IMPLEMENTED-UNTESTED | `KpisOut`/`OverviewOut`; behavior tests unverified |
 
 ## Phase 19 - audit and settings
 | Id | Gap | Status | Evidence / reason |
 |---|---|---|---|
-| P19.1 | Audit get-by-id, search, sort, total | CLOSED-TESTED / NOT CLOSED | search/sort/total done; get-by-id not built |
-| P19.2 | Outcome, IP/device, before/after, event catalogue, export, security classification | NOT CLOSED | audit `meta` carries no PII by design; the rest is not built |
+| P19.1 | Audit get-by-id, search, sort, total | PARTIAL / IMPLEMENTED-UNTESTED | search/sort/total and `GET /admin/audit/{id}` implemented; focused detail/404 assertions added but not run (local PostgreSQL unavailable) |
+| P19.2 | Outcome, IP/device, before/after, event catalogue, export, security classification | PARTIAL / IMPLEMENTED-UNTESTED | `GET /admin/audit/actions` lists recorded action keys and `GET /admin/audit.csv` provides a filtered, formula-safe CSV export; outcome/IP/device/before-after enrichment and security classification remain open. Audit meta continues to exclude PII by convention |
 | P19.3 | Typed settings, definitions | CLOSED-TESTED | `GET /admin/settings` |
 | P19.4 | Security-policy API | CLOSED-TESTED | read-only `GET /admin/security-policy` |
 | P19.5 | Secrets API | N/A-JUSTIFIED | secrets are never exposed or edited through the API |
@@ -224,7 +224,7 @@ Input: "Coral Swift - Backend Gaps (all sessions, Phase 1 to Phase 29)". Each it
 ## Phase 24 - invitation and activation
 | Id | Gap | Status | Evidence / reason |
 |---|---|---|---|
-| P24.1 | Invitation state and delivery result | CLOSED-TESTED / NOT CLOSED | state done; delivery result is not linked on the account row |
+| P24.1 | Invitation state and delivery result | PARTIAL / IMPLEMENTED-UNTESTED | account rows include the latest invitation outbox delivery status/time; focused assertions added but not run (local PostgreSQL unavailable) |
 | P24.2 | Resend/revoke with rate limit | CLOSED-TESTED | `test_invitation_actions_are_rate_limited` |
 | P24.3 | Distinct expired/used/revoked codes | CLOSED-TESTED | `TOKEN_EXPIRED`, `TOKEN_ALREADY_USED`, `TOKEN_REVOKED`, `INVALID_OR_EXPIRED_TOKEN` |
 | P24.4 | Password policy documented | CLOSED-TESTED | `/admin/security-policy`, contract |
@@ -236,34 +236,34 @@ Input: "Coral Swift - Backend Gaps (all sessions, Phase 1 to Phase 29)". Each it
 |---|---|---|---|
 | P25.1 | In-app feed, read state, unread count | CLOSED-TESTED | `GET /partner/notifications`, `POST .../{id}/read`, `read-all` (`test_gap_lists`) |
 | P25.2 | Typed notification and enquiry rows | CLOSED-TESTED | |
-| P25.3 | Document-request resource | NOT CLOSED | information requests exist; a separate resource with deadlines is not built (D10) |
-| P25.4 | Account status on `/auth/me` | NOT CLOSED | |
+| P25.3 | Document-request resource | BLOCKED-DECISION | D10 must define request lifecycle, deadlines and status before a separate resource is designed; existing messaging supports information requests and replies |
+| P25.4 | Account status on `/auth/me` | IMPLEMENTED-UNTESTED | `/auth/me` includes `account_status`; behavior test unverified because local PostgreSQL is unavailable |
 
 ## Phase 26 - company profile
 | Id | Gap | Status | Evidence / reason |
 |---|---|---|---|
 | P26.1 | Missing profile fields | BLOCKED-DECISION | D20 (not in PRD s.12 field list) |
-| P26.2 | Editable vs approval-required metadata | NOT CLOSED | rules exist in code; not exposed or documented as an endpoint |
-| P26.3 | Previous/new values in revisions | NOT CLOSED | |
-| P26.4 | Null-clearing semantics | NOT CLOSED | |
+| P26.2 | Editable vs approval-required metadata | IMPLEMENTED-UNTESTED | `GET /partner/organization/editable-fields` describes direct-update/approval/nullable behavior; test unverified because local PostgreSQL is unavailable |
+| P26.3 | Previous/new values in revisions | IMPLEMENTED-UNTESTED | history records `{old,new}` and explicit null changes; behavior test unverified |
+| P26.4 | Null-clearing semantics | IMPLEMENTED-UNTESTED | explicit null clears nullable fields, omitted fields remain unchanged; `legal_name` cannot be cleared; behavior test unverified |
 
 ## Phase 27 - partner documents
 | Id | Gap | Status | Evidence / reason |
 |---|---|---|---|
 | P27.1 | File size limit documented | CLOSED-TESTED | `max_upload_bytes`, types, in `/admin/security-policy` and the contract |
 | P27.2 | Scanning / retention | N/A-JUSTIFIED / BLOCKED-DECISION | X12 / X13 |
-| P27.3 | Additional-document request resource | NOT CLOSED | see P25.3 |
-| P27.4 | Per-document lock/permission flags | NOT CLOSED | |
+| P27.3 | Additional-document request resource | BLOCKED-DECISION | see P25.3 / D10 |
+| P27.4 | Per-document lock/permission flags | PARTIAL / IMPLEMENTED-UNTESTED | document responses include `can_replace`, `can_remove`, and `can_download` derived from current document/version status. No new lock policy was introduced; focused assertions added but not run (local PostgreSQL unavailable) |
 | P27.5 | Multiple documents per category | CLOSED-EXISTING | several logical documents per category; each has versions |
 
 ## Phases 28-29 - application tracking and onboarding
 | Id | Gap | Status | Evidence / reason |
 |---|---|---|---|
 | P28.1 | Partner-visible eligibility outcome | BLOCKED-DECISION | D27 |
-| P28.2 | Decision date/reason as fields | NOT CLOSED | `decided_at` on reviewer rows; partner payload not extended |
-| P28.3 | Information-request due date/status/link | NOT CLOSED | |
-| P28.4 | Provisioning timestamps | NOT CLOSED | |
-| P28.5 | `last_updated` on partner `ApplicationOut` | NOT CLOSED | |
+| P28.2 | Decision date/reason as fields | PARTIAL / IMPLEMENTED-UNTESTED | partner `ApplicationOut` includes `decided_at`; partner-visible reason remains blocked on D27 |
+| P28.3 | Information-request due date/status/link | BLOCKED-DECISION | information-request due-date model and onboarding stages are D10 |
+| P28.4 | Provisioning timestamps | BLOCKED-DECISION | onboarding/provisioning model and timestamps are D10 |
+| P28.5 | `last_updated` on partner `ApplicationOut` | IMPLEMENTED-UNTESTED | `last_updated` maps to application `updated_at`; behavior test unverified |
 | P29.1 | Onboarding record, checklist/tasks, history, due dates, documents | BLOCKED-DECISION | D10 |
 
 ## M - addendum
@@ -273,8 +273,8 @@ Input: "Coral Swift - Backend Gaps (all sessions, Phase 1 to Phase 29)". Each it
 | M2 | Six allocation stages | CLOSED-EXISTING | 1:1 mapping, tested by `test_transitions`/`test_reviewer`: expression of interest = `submitted`; `eligibility_verification`; `capability_review`; `commercial_legal_review`; `pilot_onboarding`; `scale_up`. Timestamps/owners/notes via status history |
 | M3 | Discussion thread per record | CLOSED-TESTED | internal notes and logged communications; external replies D15 |
 | M4 | Typed launch readiness | CLOSED-TESTED | `LaunchReadinessOut` incl. `pending_items` |
-| M5 | Typed org detail with role-limited financial fields | NOT CLOSED | |
-| M6 | Profile-change before/after | NOT CLOSED | |
+| M5 | Typed org detail with role-limited financial fields | IMPLEMENTED-UNTESTED | typed nested contract exists; BDM financial fields remain omitted; previous tests couldn't connect to local PostgreSQL |
+| M6 | Profile-change before/after | IMPLEMENTED-UNTESTED | Existing revisions record before/after values; null-clearing regression assertion added but not run because local PostgreSQL is unavailable |
 | M7 | Criteria exceptions workflow | BLOCKED-DECISION | D5 |
 | M8 | Strategic queue/owner/target | CLOSED-EXISTING | P9.7 |
 | M9 | Mandatory categories per pathway | BLOCKED-DECISION | D6 (single list today) |
