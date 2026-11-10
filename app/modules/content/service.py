@@ -233,6 +233,14 @@ def set_attachment(
     return item
 
 
+CONTENT_SORTS: dict[str, tuple[Any, ...]] = {
+    "-updated_at": (ContentItem.updated_at.desc(), ContentItem.id.desc()),
+    "updated_at": (ContentItem.updated_at.asc(), ContentItem.id.asc()),
+    "-created_at": (ContentItem.created_at.desc(), ContentItem.id.desc()),
+    "title": (ContentItem.title.asc(), ContentItem.id.asc()),
+}
+
+
 def list_admin(
     db: Session,
     limit: int,
@@ -240,8 +248,15 @@ def list_admin(
     status: S | None,
     content_type: ContentType | None,
     q: str | None,
+    updated_from: datetime | None = None,
+    updated_to: datetime | None = None,
+    sort: str = "-updated_at",
 ) -> tuple[list[ContentItem], int]:
     stmt = select(ContentItem)
+    if updated_from:
+        stmt = stmt.where(ContentItem.updated_at >= updated_from)
+    if updated_to:
+        stmt = stmt.where(ContentItem.updated_at < updated_to)
     if status:
         stmt = stmt.where(ContentItem.status == status)
     if content_type:
@@ -250,9 +265,7 @@ def list_admin(
         stmt = stmt.where(ContentItem.title.ilike(_like(q), escape="\\"))
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
     return list(
-        db.execute(
-            stmt.order_by(ContentItem.updated_at.desc()).limit(limit).offset(offset)
-        ).scalars()
+        db.execute(stmt.order_by(*CONTENT_SORTS[sort]).limit(limit).offset(offset)).scalars()
     ), total
 
 

@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Respons
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
-from app.common.pagination import PageDep
+from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
 from app.core.config import Settings, get_settings
 from app.core.protection import SubmissionGuards, rate_limit, require_human
@@ -219,10 +219,10 @@ def list_privacy(
     page: PageDep,
     status: Annotated[PrivacyRequestStatus | None, Query()] = None,
 ) -> ApiResponse[list[PrivacyRequestOut]]:
-    rows = service.list_privacy_requests(db, page.page_size, page.offset, status)
+    rows, total = service.list_privacy_requests(db, page.page_size, page.offset, status)
     return ok(
         [PrivacyRequestOut.model_validate(r, from_attributes=True) for r in rows],
-        meta={"page": page.page, "page_size": page.page_size},
+        meta=page_meta(page, total),
     )
 
 

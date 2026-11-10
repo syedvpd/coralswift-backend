@@ -1,11 +1,12 @@
 """Reviewer / staff endpoints needed for partner application processing (not the Phase 3 admin)."""
 
 import uuid
-from typing import Annotated, Any
+from datetime import datetime
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, EmailStr, model_validator
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, or_, select
 
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
@@ -14,7 +15,9 @@ from app.core.config import Settings, get_settings
 from app.core.exceptions import AppError, NotFoundError
 from app.core.protection import rate_limit
 from app.database.dependencies import DbSession
+from app.modules.admin import lookups
 from app.modules.applications import service as app_service
+from app.modules.applications import transitions
 from app.modules.applications.constants import PortalStatus
 from app.modules.applications.models import (
     ApplicationStatusHistory,
@@ -37,6 +40,7 @@ from app.modules.partner_documents.schemas import (
     document_out,
     version_out,
 )
+from app.modules.partners.constants import EngagementPathway
 from app.modules.reviews import service
 from app.modules.reviews.schemas import (
     AssignIn,
@@ -73,7 +77,13 @@ def _dispatch(request: Request, settings: Settings, background: BackgroundTasks)
     )
 
 
-def _app_out(app: PortalApplication, org_name: str) -> ReviewerApplicationOut:
+def _app_out(
+    app: PortalApplication,
+    org_name: str,
+    *,
+    reviewer_name: str | None = None,
+    contacts: list[dict[str, Any]] | None = None,
+) -> ReviewerApplicationOut:
     return ReviewerApplicationOut(
         id=app.id,
         reference=app.reference,
@@ -84,7 +94,19 @@ def _app_out(app: PortalApplication, org_name: str) -> ReviewerApplicationOut:
         assigned_reviewer_id=app.assigned_reviewer_id,
         submission_count=app.submission_count,
         submitted_at=app.submitted_at,
+        updated_at=app.updated_at,
+        decided_at=app.decided_at,
+        assigned_reviewer_name=reviewer_name,
+        primary_contact=_primary(contacts),
+        allowed_next=transitions.allowed_targets(transitions.Actor.REVIEWER, app.status),
     )
+
+
+def _primary(contacts: list[dict[str, Any]] | None) -> dict[str, Any] | None:
+    if not contacts:
+        return None
+    first = contacts[0]
+    return {k: first.get(k) for k in ("name", "email", "phone", "role") if k in first} or None
 
 
 # ------------------------------------------------------------- invitations
@@ -176,21 +198,90 @@ def list_applications(
     page: PageDep,
     status: Annotated[PortalStatus | None, Query()] = None,
     unassigned: Annotated[bool, Query()] = False,
+    assigned_reviewer_id: Annotated[uuid.UUID | None, Query()] = None,
+    q: Annotated[
+        str | None, Query(max_length=100, description="reference, organisation, contact name/email")
+    ] = None,
+    pathway: Annotated[EngagementPathway | None, Query()] = None,
+    submitted_from: Annotated[datetime | None, Query()] = None,
+    submitted_to: Annotated[datetime | None, Query()] = None,
+    updated_from: Annotated[datetime | None, Query()] = None,
+    updated_to: Annotated[datetime | None, Query()] = None,
+    sort: Annotated[
+        Literal["submitted_at", "-submitted_at", "updated_at", "-updated_at", "reference"], Query()
+    ] = "submitted_at",
 ) -> ApiResponse[list[ReviewerApplicationOut]]:
-    base = service.reviewable_query(staff)
+    base = service.reviewable_query(staff).join(
+        PartnerOrganization, PartnerOrganization.id == PortalApplication.organization_id
+    )
     if status is not None:
         base = base.where(PortalApplication.status == status)
     if unassigned:
         base = base.where(PortalApplication.assigned_reviewer_id.is_(None))
+    if assigned_reviewer_id:
+        base = base.where(PortalApplication.assigned_reviewer_id == assigned_reviewer_id)
+    if pathway:
+        base = base.where(PortalApplication.pathway == pathway)
+    if submitted_from:
+        base = base.where(PortalApplication.submitted_at >= submitted_from)
+    if submitted_to:
+        base = base.where(PortalApplication.submitted_at < submitted_to)
+    if updated_from:
+        base = base.where(PortalApplication.updated_at >= updated_from)
+    if updated_to:
+        base = base.where(PortalApplication.updated_at < updated_to)
+    if q:
+        like = "%" + q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        base = base.where(
+            or_(
+                PortalApplication.reference.ilike(like, escape="\\"),
+                PartnerOrganization.legal_name.ilike(like, escape="\\"),
+                cast(PartnerOrganization.authorized_contacts, String).ilike(like, escape="\\"),
+            )
+        )
     total = db.execute(select(func.count()).select_from(base.subquery())).scalar_one()
+    orders: dict[str, tuple[Any, ...]] = {
+        "submitted_at": (
+            PortalApplication.submitted_at.asc().nulls_last(),
+            PortalApplication.id.asc(),
+        ),
+        "-submitted_at": (
+            PortalApplication.submitted_at.desc().nulls_last(),
+            PortalApplication.id.desc(),
+        ),
+        "updated_at": (PortalApplication.updated_at.asc(), PortalApplication.id.asc()),
+        "-updated_at": (PortalApplication.updated_at.desc(), PortalApplication.id.desc()),
+        "reference": (PortalApplication.reference.asc(),),
+    }
     rows = db.execute(
-        base.add_columns(PartnerOrganization.legal_name)
-        .join(PartnerOrganization, PartnerOrganization.id == PortalApplication.organization_id)
-        .order_by(PortalApplication.submitted_at.asc().nulls_last())
+        base.add_columns(PartnerOrganization.legal_name, PartnerOrganization.authorized_contacts)
+        .order_by(*orders[sort])
         .limit(page.page_size)
         .offset(page.offset)
     ).all()
-    return ok([_app_out(a, name) for a, name in rows], meta=page_meta(page, total))
+    names = lookups.user_names(db, (a.assigned_reviewer_id for a, _, _ in rows))
+    return ok(
+        [
+            _app_out(
+                a,
+                name,
+                reviewer_name=names.get(a.assigned_reviewer_id) if a.assigned_reviewer_id else None,
+                contacts=contacts,
+            )
+            for a, name, contacts in rows
+        ],
+        meta=page_meta(page, total),
+    )
+
+
+@router.get(
+    "/transitions",
+    response_model=ApiResponse[list[dict[str, Any]]],
+    responses=_ERR,
+    summary="Every status change a reviewer may make, with its requirements",
+)
+def reviewer_transitions(staff: ReviewerDep) -> ApiResponse[list[dict[str, Any]]]:
+    return ok(transitions.transition_table(transitions.Actor.REVIEWER))
 
 
 class ReviewDetailOut(BaseModel):
@@ -213,21 +304,34 @@ def detail(
 ) -> ApiResponse[ReviewDetailOut]:
     app = service.get_reviewable(db, staff, application_id)
     org = org_service.get_organization(db, app.organization_id)
-    history = db.execute(
-        select(ApplicationStatusHistory)
-        .where(ApplicationStatusHistory.application_id == app.id)
-        .order_by(ApplicationStatusHistory.created_at)
-    ).scalars()
+    history = list(
+        db.execute(
+            select(ApplicationStatusHistory)
+            .where(ApplicationStatusHistory.application_id == app.id)
+            .order_by(ApplicationStatusHistory.created_at)
+        ).scalars()
+    )
+    names = lookups.user_names(db, [h.actor_user_id for h in history] + [app.assigned_reviewer_id])
+    items = [HistoryItem.model_validate(h, from_attributes=True) for h in history]
+    for item in items:
+        item.actor_name = names.get(item.actor_user_id)
     return ok(
         ReviewDetailOut(
-            application=_app_out(app, org.legal_name),
+            application=_app_out(
+                app,
+                org.legal_name,
+                reviewer_name=names.get(app.assigned_reviewer_id)
+                if app.assigned_reviewer_id
+                else None,
+                contacts=org.authorized_contacts,
+            ),
             organization=OrganizationOut.model_validate(org),
             documents=[document_out(d, v) for d, v in doc_service.list_documents(db, org.id)],
             eligibility_verifications=[
                 EligibilityOut.model_validate(e, from_attributes=True)
                 for e in service.list_eligibility(db, app.id)
             ],
-            status_history=[HistoryItem.model_validate(h, from_attributes=True) for h in history],
+            status_history=items,
             open_information_requests=app_service.open_request_count(db, app.id),
         )
     )
@@ -252,7 +356,16 @@ def assign(
     db.commit()
     _dispatch(request, settings, background)
     org = org_service.get_organization(db, app.organization_id)
-    return ok(_app_out(app, org.legal_name), "Reviewer assigned")
+    names = lookups.user_names(db, [app.assigned_reviewer_id])
+    return ok(
+        _app_out(
+            app,
+            org.legal_name,
+            reviewer_name=names.get(app.assigned_reviewer_id) if app.assigned_reviewer_id else None,
+            contacts=org.authorized_contacts,
+        ),
+        "Reviewer updated",
+    )
 
 
 @router.post(
@@ -364,10 +477,18 @@ def list_notes(
     application_id: uuid.UUID, staff: ReviewerDep, db: DbSession
 ) -> ApiResponse[list[NoteOut]]:
     app = service.get_reviewable(db, staff, application_id)
+    notes = service.list_notes(db, app.id)
+    names = lookups.user_names(db, (n.author_id for n in notes))
     return ok(
         [
-            NoteOut(id=n.id, author_id=n.author_id, body=n.body, created_at=n.created_at)
-            for n in service.list_notes(db, app.id)
+            NoteOut(
+                id=n.id,
+                author_id=n.author_id,
+                body=n.body,
+                created_at=n.created_at,
+                author_name=names.get(n.author_id),
+            )
+            for n in notes
         ]
     )
 

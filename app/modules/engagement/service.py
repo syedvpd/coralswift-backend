@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.common.utilities import utcnow
@@ -230,15 +230,17 @@ def create_privacy_request(
 
 def list_privacy_requests(
     db: Session, limit: int, offset: int, status: PrivacyRequestStatus | None
-) -> list[PrivacyRequest]:
+) -> tuple[list[PrivacyRequest], int]:
     stmt = select(PrivacyRequest)
     if status:
         stmt = stmt.where(PrivacyRequest.status == status)
-    return list(
-        db.execute(
-            stmt.order_by(PrivacyRequest.created_at.desc()).limit(limit).offset(offset)
-        ).scalars()
-    )
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    rows = db.execute(
+        stmt.order_by(PrivacyRequest.created_at.desc(), PrivacyRequest.id.desc())
+        .limit(limit)
+        .offset(offset)
+    ).scalars()
+    return list(rows), total
 
 
 def update_privacy_request(

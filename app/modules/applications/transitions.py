@@ -86,3 +86,33 @@ def resume_rule(source: S, target: S) -> Rule:
     ):
         raise invalid()
     return Rule(Actor.PARTNER, frozenset({S.INFORMATION_REQUESTED}), target)
+
+
+def allowed_targets(actor: Actor, source: S) -> list[S]:
+    """Statuses `actor` may move an application to from `source` (information_requested resumes the
+    stage it came from, which only the partner can do and which depends on the application)."""
+    if source in TERMINAL:
+        return []
+    out: list[S] = []
+    for rule in RULES:
+        if rule.actor is actor and source in rule.sources and rule.target not in out:
+            out.append(rule.target)
+    return out
+
+
+def transition_table(actor: Actor) -> list[dict[str, object]]:
+    """Every rule for `actor`, for clients: from -> to, whether a reason is required."""
+    rows: list[dict[str, object]] = []
+    for rule in RULES:
+        if rule.actor is actor:
+            for source in sorted(rule.sources, key=lambda s: s.value):
+                rows.append(
+                    {
+                        "from": source.value,
+                        "to": rule.target.value,
+                        "needs_reason": rule.needs_reason,
+                        "needs_assigned_reviewer": rule.needs_assignee,
+                        "dedicated_endpoint": rule.target in DEDICATED_TARGETS,
+                    }
+                )
+    return rows

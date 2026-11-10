@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
@@ -245,8 +245,23 @@ def list_admin(
     status: Annotated[ContentStatus | None, Query()] = None,
     type: Annotated[ContentType | None, Query()] = None,
     q: Annotated[str | None, Query(max_length=100)] = None,
+    updated_from: Annotated[datetime | None, Query()] = None,
+    updated_to: Annotated[datetime | None, Query()] = None,
+    sort: Annotated[
+        Literal["-updated_at", "updated_at", "-created_at", "title"], Query()
+    ] = "-updated_at",
 ) -> ApiResponse[list[AdminContent]]:  # noqa: A002
-    items, total = service.list_admin(db, page.page_size, page.offset, status, type, q)
+    items, total = service.list_admin(
+        db,
+        page.page_size,
+        page.offset,
+        status,
+        type,
+        q,
+        updated_from=updated_from,
+        updated_to=updated_to,
+        sort=sort,
+    )
     return ok([_adm(i) for i in items], meta=page_meta(page, total))
 
 

@@ -6,7 +6,10 @@ from fastapi import APIRouter, Depends
 
 from app.common.responses import ApiResponse, ok
 from app.core.config import Settings, get_settings
+from app.modules.admin.followups_router import router as admin_followups_router
 from app.modules.admin.ops_router import router as admin_ops_router
+from app.modules.admin.people_router import router as admin_people_router
+from app.modules.admin.reference_router import router as admin_reference_router
 from app.modules.admin.router import router as admin_router
 from app.modules.applications.router import router as applications_router
 from app.modules.auth.router import router as auth_router
@@ -38,6 +41,9 @@ for _router in (
     auth_router,
     admin_router,
     admin_ops_router,
+    admin_followups_router,
+    admin_people_router,
+    admin_reference_router,
     catalog_router,
     content_admin_router,
     content_claims_router,

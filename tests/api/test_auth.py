@@ -63,9 +63,7 @@ def test_invitation_token_is_single_use_and_policy_checked(
         == 200
     )
     replay = client.post(f"{A}/invitations/accept", json={"token": token, "password": PASSWORD})
-    assert (
-        replay.status_code == 400 and replay.json()["error"]["code"] == "INVALID_OR_EXPIRED_TOKEN"
-    )
+    assert replay.status_code == 400 and replay.json()["error"]["code"] == "TOKEN_ALREADY_USED"
     assert (
         client.post(
             f"{A}/invitations/accept", json={"token": "cs_bogus_token_value", "password": PASSWORD}
@@ -197,9 +195,9 @@ def test_deactivated_account_old_token_fails(
         client.post(f"{A}/refresh", json={"refresh_token": p.tokens["refresh_token"]}).status_code
         == 401
     )
-    assert (
-        client.post(f"{A}/login", json={"email": p.email, "password": PASSWORD}).status_code == 401
-    )
+    login_again = client.post(f"{A}/login", json={"email": p.email, "password": PASSWORD})
+    assert login_again.status_code == 403  # right password: the account is named as deactivated
+    assert login_again.json()["error"]["code"] == "ACCOUNT_DEACTIVATED"
 
 
 def test_sessions_list_and_revoke(

@@ -2,14 +2,14 @@
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
-from app.common.pagination import PageDep
+from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
 from app.common.utilities import utcnow
 from app.common.validation import Long
@@ -17,7 +17,7 @@ from app.core.config import Settings, get_settings
 from app.core.exceptions import AppError, NotFoundError
 from app.core.protection import rate_limit
 from app.database.dependencies import DbSession
-from app.modules.auth.dependencies import PartnerDep, StaffContext, SuperAdminDep
+from app.modules.auth.dependencies import PartnerContext, PartnerDep, StaffContext, SuperAdminDep
 from app.modules.auth.models import User
 from app.modules.enquiries.activity import log_activity
 from app.modules.enquiries.constants import ActorType
@@ -134,44 +134,120 @@ def list_requests(ctx: PartnerDep, db: DbSession) -> ApiResponse[list[ChangeRequ
     return ok([_out(r) for r in rows])
 
 
+class PartnerNotificationOut(BaseModel):
+    id: uuid.UUID
+    template: str  # which message it was; content and links are never returned
+    delivery_status: str
+    created_at: datetime
+    read_at: datetime | None
+    is_read: bool
+
+
+class PartnerEnquiryOut(BaseModel):
+    reference_number: str
+    enquiry_type: str
+    status: str
+    submitted_at: datetime
+
+
+def _mine(ctx: PartnerContext) -> list[Any]:
+    return [
+        Notification.recipient == ctx.user.email,
+        Notification.notification_type != NotificationType.ACCOUNT,
+    ]
+
+
 @partner.get(
     "/notifications",
-    response_model=ApiResponse[list[dict[str, Any]]],
+    response_model=ApiResponse[list[PartnerNotificationOut]],
     responses=_ERR,
-    summary="Emails sent to you (type and status only, never content)",
+    summary="Messages sent to you with read state (meta has total and unread counts)",
 )
 def my_notifications(
-    ctx: PartnerDep, db: DbSession, page: PageDep
-) -> ApiResponse[list[dict[str, Any]]]:
+    ctx: PartnerDep,
+    db: DbSession,
+    page: PageDep,
+    unread: Annotated[bool, Query(description="Only unread")] = False,
+) -> ApiResponse[list[PartnerNotificationOut]]:
+    base = select(Notification).where(*_mine(ctx))
+    unread_count = db.execute(
+        select(func.count()).select_from(base.where(Notification.read_at.is_(None)).subquery())
+    ).scalar_one()
+    stmt = base.where(Notification.read_at.is_(None)) if unread else base
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
     rows = db.execute(
-        select(Notification)
-        .where(
-            Notification.recipient == ctx.user.email,
-            Notification.notification_type != NotificationType.ACCOUNT,
-        )
-        .order_by(Notification.created_at.desc())
+        stmt.order_by(Notification.created_at.desc(), Notification.id.desc())
         .limit(page.page_size)
         .offset(page.offset)
     ).scalars()
     return ok(
         [
-            {
-                "template": n.template_key.value,
-                "delivery_status": n.delivery_status.value,
-                "created_at": n.created_at,
-            }
+            PartnerNotificationOut(
+                id=n.id,
+                template=n.template_key.value,
+                delivery_status=n.delivery_status.value,
+                created_at=n.created_at,
+                read_at=n.read_at,
+                is_read=n.read_at is not None,
+            )
             for n in rows
-        ]
+        ],
+        meta={**page_meta(page, total), "unread": unread_count},
+    )
+
+
+@partner.post(
+    "/notifications/read-all",
+    response_model=ApiResponse[dict[str, int]],
+    responses=_ERR,
+    summary="Mark all your messages as read",
+)
+def read_all(ctx: PartnerDep, db: DbSession) -> ApiResponse[dict[str, int]]:
+    result = db.execute(
+        update(Notification)
+        .where(*_mine(ctx), Notification.read_at.is_(None))
+        .values(read_at=utcnow())
+    )
+    db.commit()
+    return ok({"marked": int(getattr(result, "rowcount", 0))})
+
+
+@partner.post(
+    "/notifications/{notification_id}/read",
+    response_model=ApiResponse[PartnerNotificationOut],
+    responses=_ERR,
+    summary="Mark one message as read (only your own; others are 404)",
+)
+def read_one(
+    notification_id: uuid.UUID, ctx: PartnerDep, db: DbSession
+) -> ApiResponse[PartnerNotificationOut]:
+    n = db.execute(
+        select(Notification).where(Notification.id == notification_id, *_mine(ctx))
+    ).scalar_one_or_none()
+    if n is None:
+        raise NotFoundError("Notification not found")
+    if n.read_at is None:
+        n.read_at = utcnow()
+        db.commit()
+    return ok(
+        PartnerNotificationOut(
+            id=n.id,
+            template=n.template_key.value,
+            delivery_status=n.delivery_status.value,
+            created_at=n.created_at,
+            read_at=n.read_at,
+            is_read=True,
+        )
     )
 
 
 @partner.get(
     "/enquiries",
-    response_model=ApiResponse[list[dict[str, Any]]],
+    response_model=ApiResponse[list[PartnerEnquiryOut]],
     responses=_ERR,
     summary="Enquiry history: your organization's origin enquiry and your own submissions",
 )
-def my_enquiries(ctx: PartnerDep, db: DbSession) -> ApiResponse[list[dict[str, Any]]]:
+def my_enquiries(ctx: PartnerDep, db: DbSession) -> ApiResponse[list[PartnerEnquiryOut]]:
     org = db.get(PartnerOrganization, ctx.organization_id)
     conds = [Contact.business_email == ctx.user.email]
     if org and org.source_enquiry_id:
@@ -185,12 +261,12 @@ def my_enquiries(ctx: PartnerDep, db: DbSession) -> ApiResponse[list[dict[str, A
     ).scalars()
     return ok(
         [
-            {
-                "reference_number": e.reference_number,
-                "enquiry_type": e.enquiry_type.value,
-                "status": e.status.value,
-                "submitted_at": e.created_at,
-            }
+            PartnerEnquiryOut(
+                reference_number=e.reference_number,
+                enquiry_type=e.enquiry_type.value,
+                status=e.status.value,
+                submitted_at=e.created_at,
+            )
             for e in rows
         ]
     )
@@ -253,18 +329,24 @@ def decide(
     summary="Profile change requests (super administrator)",
 )
 def admin_list(
-    staff: SuperAdminDep, db: DbSession, status: str = "pending"
+    staff: SuperAdminDep,
+    db: DbSession,
+    page: PageDep,
+    status: Annotated[Literal["pending", "approved", "rejected"], Query()] = "pending",
 ) -> ApiResponse[list[AdminChangeRequestOut]]:
+    stmt = select(ProfileChangeRequest).where(ProfileChangeRequest.status == status)
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
     rows = db.execute(
-        select(ProfileChangeRequest)
-        .where(ProfileChangeRequest.status == status)
-        .order_by(ProfileChangeRequest.created_at)
+        stmt.order_by(ProfileChangeRequest.created_at, ProfileChangeRequest.id)
+        .limit(page.page_size)
+        .offset(page.offset)
     ).scalars()
     return ok(
         [
             AdminChangeRequestOut(**_out(r).model_dump(), organization_id=r.organization_id)
             for r in rows
-        ]
+        ],
+        meta=page_meta(page, total),
     )
 
 

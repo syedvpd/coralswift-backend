@@ -3,7 +3,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
@@ -15,9 +15,10 @@ from app.common.utilities import utcnow
 from app.core.config import Settings, get_settings
 from app.core.exceptions import AppError, NotFoundError
 from app.database.dependencies import DbSession
-from app.modules.admin import service
+from app.modules.admin import lookups, service
 from app.modules.admin import settings_service as cfg
 from app.modules.admin.models import EnquiryFollowUp, NotificationTemplate
+from app.modules.admin.schemas import NotificationRow
 from app.modules.applications.constants import PortalStatus
 from app.modules.applications.models import EligibilityVerification, PortalApplication
 from app.modules.auth import service as auth_service
@@ -33,6 +34,48 @@ from app.modules.notifications.models import Notification
 from app.modules.notifications.service import dispatch_notifications
 from app.modules.notifications.templates import render_override, validate_template
 from app.modules.partner_documents.models import PartnerDocumentVersion
+
+
+class QueueGate(BaseModel):
+    owner: bool
+    sla_hours: bool
+    escalation: bool
+
+
+class LaunchReadinessOut(BaseModel):
+    contact: dict[str, Literal["confirmed", "omitted", "pending"]]
+    queues: dict[str, QueueGate]
+    ready: bool
+    pending_items: list[str]
+
+
+class SettingDefinition(BaseModel):
+    key: str
+    group: str
+    value_kind: Literal["integer", "boolean", "email", "user_id", "text"]
+    unit: str | None = None
+
+
+class SettingsOut(BaseModel):
+    values: dict[str, str]  # only settings that have been set
+    allowed_keys: list[str]
+    definitions: list[SettingDefinition]
+
+
+def _describe(key: str) -> dict[str, Any]:
+    """Read-only description of a registry key; validation itself stays in settings_service."""
+    group = key.split(".")[0]
+    if key.startswith("sla.") or key.startswith("retention.") or key == "expiry_reminder_days":
+        unit = "hours" if group == "sla" else "days"
+        return {"group": group, "value_kind": "integer", "unit": unit}
+    if key.startswith("route."):
+        return {"group": group, "value_kind": "user_id", "unit": None}
+    if key.startswith("escalation.email."):
+        return {"group": group, "value_kind": "email", "unit": None}
+    if key == "ack_promise_enabled":
+        return {"group": "acknowledgement", "value_kind": "boolean", "unit": None}
+    return {"group": group, "value_kind": "text", "unit": None}
+
 
 router = APIRouter(prefix="/admin", tags=["admin-operations"])
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -58,12 +101,18 @@ class SettingIn(BaseModel):
 
 @router.get(
     "/settings",
-    response_model=ApiResponse[dict[str, Any]],
+    response_model=ApiResponse[SettingsOut],
     responses=_ERR,
     summary="Stored settings and the keys that can be set",
 )
-def list_settings(staff: SuperAdminDep, db: DbSession) -> ApiResponse[dict[str, Any]]:
-    return ok({"values": cfg.list_all(db), "allowed_keys": sorted(cfg.REGISTRY)})
+def list_settings(staff: SuperAdminDep, db: DbSession) -> ApiResponse[SettingsOut]:
+    return ok(
+        SettingsOut(
+            values=cfg.list_all(db),
+            allowed_keys=sorted(cfg.REGISTRY),
+            definitions=[SettingDefinition(key=k, **_describe(k)) for k in sorted(cfg.REGISTRY)],
+        )
+    )
 
 
 @router.put("/settings/{key}", response_model=ApiResponse[dict[str, str]], responses=_ERR)
@@ -409,32 +458,60 @@ def kpis(
 # ------------------------------------------------- notification failure visibility
 @router.get(
     "/notifications",
-    response_model=ApiResponse[list[dict[str, Any]]],
+    response_model=ApiResponse[list[NotificationRow]],
     responses=_ERR,
-    summary="Outbox rows by status (default failed): lets staff see and act on delivery failures",
+    summary="Outbox rows (default: failed) with filters and sorting",
 )
 def list_notifications(
     staff: SuperAdminDep,
     db: DbSession,
     page: PageDep,
-    status: Annotated[DeliveryStatus, Query()] = DeliveryStatus.FAILED,
-) -> ApiResponse[list[dict[str, Any]]]:
-    stmt = select(Notification).where(Notification.delivery_status == status)
+    status: Annotated[DeliveryStatus | Literal["all"], Query()] = DeliveryStatus.FAILED,
+    template: Annotated[TemplateKey | None, Query()] = None,
+    q: Annotated[
+        str | None, Query(max_length=120, description="Partial match on recipient")
+    ] = None,
+    created_from: Annotated[datetime | None, Query()] = None,
+    created_to: Annotated[datetime | None, Query()] = None,
+    sort: Annotated[Literal["created_at", "-created_at"], Query()] = "-created_at",
+) -> ApiResponse[list[NotificationRow]]:
+    stmt = select(Notification)
+    if status != "all":
+        stmt = stmt.where(Notification.delivery_status == status)
+    if template:
+        stmt = stmt.where(Notification.template_key == template)
+    if q:
+        stmt = stmt.where(Notification.recipient.ilike(service._like(q), escape="\\"))
+    if created_from:
+        stmt = stmt.where(Notification.created_at >= created_from)
+    if created_to:
+        stmt = stmt.where(Notification.created_at < created_to)
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
-    rows = db.execute(
-        stmt.order_by(Notification.created_at.desc()).limit(page.page_size).offset(page.offset)
-    ).scalars()
+    # id is the tie-breaker so pages are stable when rows share a timestamp
+    order = (
+        (Notification.created_at.asc(), Notification.id.asc())
+        if sort == "created_at"
+        else (Notification.created_at.desc(), Notification.id.desc())
+    )
+    rows = list(
+        db.execute(stmt.order_by(*order).limit(page.page_size).offset(page.offset)).scalars()
+    )
+    strategic = lookups.strategic_enquiry_ids(db, (n.enquiry_id for n in rows))
     return ok(
         [
-            {
-                "id": n.id,
-                "recipient": n.recipient,
-                "template": n.template_key.value,
-                "status": n.delivery_status.value,
-                "retry_count": n.retry_count,
-                "last_error": n.last_error,
-                "created_at": n.created_at,
-            }
+            NotificationRow(
+                id=n.id,
+                recipient=n.recipient,
+                template=n.template_key.value,
+                notification_type=n.notification_type.value,
+                status=n.delivery_status.value,
+                retry_count=n.retry_count,
+                last_error=n.last_error,
+                created_at=n.created_at,
+                sent_at=n.sent_at,
+                enquiry_id=n.enquiry_id,
+                is_strategic=n.enquiry_id in strategic,
+            )
             for n in rows
         ],
         meta=page_meta(page, total),
@@ -505,13 +582,13 @@ def retry_notification(
 # ------------------------------------------------------------ launch readiness
 @router.get(
     "/launch-readiness",
-    response_model=ApiResponse[dict[str, Any]],
+    response_model=ApiResponse[LaunchReadinessOut],
     responses=_ERR,
     summary="PRD s.28 launch gates: contact details and queue configuration",
 )
-def launch_readiness(staff: SuperAdminDep, db: DbSession) -> ApiResponse[dict[str, Any]]:
+def launch_readiness(staff: SuperAdminDep, db: DbSession) -> ApiResponse[LaunchReadinessOut]:
     values = cfg.list_all(db)
-    contact = {}
+    contact: dict[str, Literal["confirmed", "omitted", "pending"]] = {}
     for item in cfg.CONTACT_ITEMS:
         if f"contact.{item}" in values:
             contact[item] = "confirmed"
@@ -520,18 +597,18 @@ def launch_readiness(staff: SuperAdminDep, db: DbSession) -> ApiResponse[dict[st
         else:
             contact[item] = "pending"
     queues = {
-        q: {
-            "owner": f"route.owner.{q}" in values,
-            "sla_hours": f"sla.{q}" in values,
-            "escalation": f"escalation.email.{q}" in values,
-        }
+        q: QueueGate(
+            owner=f"route.owner.{q}" in values,
+            sla_hours=f"sla.{q}" in values,
+            escalation=f"escalation.email.{q}" in values,
+        )
         for q in cfg.QUEUES
     }
+    pending = [f"contact.{k}" for k, v in contact.items() if v == "pending"]
+    for q, gate in queues.items():
+        pending += [f"{q}.{k}" for k, ok_ in gate.model_dump().items() if not ok_]
     return ok(
-        {
-            "contact": contact,
-            "queues": queues,
-            "ready": all(v != "pending" for v in contact.values())
-            and all(all(q.values()) for q in queues.values()),
-        }
+        LaunchReadinessOut(
+            contact=contact, queues=queues, ready=not pending, pending_items=sorted(pending)
+        )
     )

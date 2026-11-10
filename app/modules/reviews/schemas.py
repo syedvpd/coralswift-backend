@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -12,7 +13,7 @@ from app.modules.partner_documents.constants import PartnerDocCategory, ReviewSt
 class AssignIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    reviewer_id: uuid.UUID
+    reviewer_id: uuid.UUID | None = None  # null clears the reviewer
 
 
 class TransitionIn(BaseModel):
@@ -41,6 +42,7 @@ class NoteOut(BaseModel):
     author_id: uuid.UUID
     body: str
     created_at: datetime
+    author_name: str | None = None
 
 
 class EligibilityIn(BaseModel):
@@ -106,6 +108,11 @@ class ReviewerApplicationOut(BaseModel):
     assigned_reviewer_id: uuid.UUID | None
     submission_count: int
     submitted_at: datetime | None
+    updated_at: datetime | None = None
+    decided_at: datetime | None = None
+    assigned_reviewer_name: str | None = None
+    primary_contact: dict[str, Any] | None = None  # first authorised contact of the organisation
+    allowed_next: list[PortalStatus] = []  # statuses the reviewer may move it to from here
 
 
 class HistoryItem(BaseModel):
@@ -116,6 +123,7 @@ class HistoryItem(BaseModel):
     reason: str | None
     partner_note: str | None
     created_at: datetime
+    actor_name: str | None = None
 
 
 class ReviewerMessageOut(BaseModel):

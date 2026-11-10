@@ -151,3 +151,6 @@ Rerun in the audit: ruff, format, mypy, full pytest (214 passed, includes the Ph
 
 ### I.2 Corrections (2026-11-09)
 Latest local run: 219 passed. Turnstile now needs `CAPTCHA_ENABLED=true` plus `TURNSTILE_SECRET_KEY`, and production configuration refuses to load without both; the integration is still mock-tested only. Decision unchanged: **FAIL - PHASE 1 NOT ACCEPTED**.
+
+### I.3 Scanning decision (2026-11-10)
+The owner formally accepted quarantine-only uploads (no malware scanner). This closes the scanner-choice blocker as an accepted risk; it is not a scan. Phase 1 remains **FAIL - PHASE 1 NOT ACCEPTED**: real Brevo delivery, real Turnstile verification, business decisions, private-bucket confirmation and a deployed-environment check are still open.

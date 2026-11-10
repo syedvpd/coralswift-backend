@@ -144,6 +144,7 @@ def require_staff(*roles: StaffRole) -> Callable[[AuthContext], StaffContext]:
             raise forbidden()
         return StaffContext(user, auth.session)
 
+    dependency.allowed_roles = frozenset(allowed)  # type: ignore[attr-defined]
     return dependency
 
 

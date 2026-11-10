@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -23,6 +23,12 @@ class EnquiryRow(BaseModel):
     assigned_user_id: uuid.UUID | None
     next_follow_up_at: datetime | None
     created_at: datetime
+    updated_at: datetime | None = None
+    contact_phone: str | None = None
+    assigned_user_name: str | None = None
+    first_response_at: datetime | None = None
+    response_due_at: datetime | None = None
+    category: str | None = None  # project category, or strategic discussion type
 
 
 class EnquiryUpdate(BaseModel):
@@ -38,11 +44,26 @@ class AssignIn(BaseModel):
     user_id: uuid.UUID | None = Field(description="null clears the owner")
 
 
+FollowUpKind = Literal["note", "follow_up", "communication"]
+
+
 class FollowUpIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     note: Long
     due_at: datetime | None = None
+    kind: FollowUpKind = "follow_up"  # note = internal, communication = contact with the requester
+    assignee_id: uuid.UUID | None = None
+
+
+class FollowUpUpdate(BaseModel):
+    """Only the fields you send change; send null to clear due_at or assignee_id."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    note: Long | None = None
+    due_at: datetime | None = None
+    assignee_id: uuid.UUID | None = None
 
 
 class FollowUpOut(BaseModel):
@@ -53,6 +74,24 @@ class FollowUpOut(BaseModel):
     note: str
     due_at: datetime | None
     completed_at: datetime | None
+    created_at: datetime
+    kind: str = "follow_up"
+    status: str = "open"  # open | completed | cancelled
+    cancelled_at: datetime | None = None
+    assignee_id: uuid.UUID | None = None
+    author_name: str | None = None
+    assignee_name: str | None = None
+    enquiry_id: uuid.UUID | None = None
+    enquiry_reference: str | None = None
+
+
+class ActivityOut(BaseModel):
+    id: uuid.UUID
+    action: str
+    actor_type: str
+    actor_user_id: uuid.UUID | None
+    actor_name: str | None
+    meta: dict[str, Any]
     created_at: datetime
 
 
@@ -73,6 +112,8 @@ class OrgRow(BaseModel):
     country: str | None
     created_at: datetime
     open_application_status: str | None
+    updated_at: datetime | None = None
+    primary_contact: dict[str, Any] | None = None
 
 
 class OrgStatusIn(BaseModel):
@@ -104,6 +145,8 @@ class StaffOut(BaseModel):
     status: str
     mfa_enabled: bool
     last_login_at: datetime | None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class AuditRow(BaseModel):
@@ -117,3 +160,21 @@ class AuditRow(BaseModel):
     request_id: str | None
     meta: dict[str, Any]
     created_at: datetime
+    actor_name: str | None = None  # full name of actor_user_id
+    is_strategic: bool = (
+        False  # the record is a strategic/M&A enquiry (super administrators only see these rows)
+    )
+
+
+class NotificationRow(BaseModel):
+    id: uuid.UUID
+    recipient: str
+    template: str
+    notification_type: str
+    status: str
+    retry_count: int
+    last_error: str | None
+    created_at: datetime
+    sent_at: datetime | None
+    enquiry_id: uuid.UUID | None
+    is_strategic: bool = False

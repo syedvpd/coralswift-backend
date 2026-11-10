@@ -120,6 +120,15 @@ def login(
         select(User).where(User.email == email).with_for_update()
     ).scalar_one_or_none()
     if user is None or user.password_hash is None or user.status is not UserStatus.ACTIVE:
+        if (
+            user is not None
+            and user.password_hash is not None
+            and user.status is UserStatus.DEACTIVATED
+            and verify_password(settings, user.password_hash, password)
+        ):
+            raise AppError(
+                "This account has been deactivated", status_code=403, code="ACCOUNT_DEACTIVATED"
+            )
         burn_verify(settings, password)
         raise _invalid_credentials()
     if user.locked_until and user.locked_until > now:
@@ -208,8 +217,9 @@ def _create_token(
             AuthToken.user_id == user.id,
             AuthToken.purpose == purpose,
             AuthToken.used_at.is_(None),
+            AuthToken.revoked_at.is_(None),
         )
-        .values(used_at=now)
+        .values(revoked_at=now)
     )
     raw = new_token()
     row = AuthToken(
@@ -232,14 +242,34 @@ def _consume_token(db: Session, raw: str, purpose: TokenPurpose) -> uuid.UUID:
             AuthToken.token_hash == hash_token(raw),
             AuthToken.purpose == purpose,
             AuthToken.used_at.is_(None),
+            AuthToken.revoked_at.is_(None),
             AuthToken.expires_at > utcnow(),
         )
         .values(used_at=utcnow())
         .returning(AuthToken.user_id)
     ).first()
     if row is None:
-        raise _invalid_token()
+        raise _token_failure(db, raw, purpose)
     return uuid.UUID(str(row[0]))
+
+
+def _token_failure(db: Session, raw: str, purpose: TokenPurpose) -> AppError:
+    """Why a one-time token cannot be used. The token is a 256-bit secret, so naming the reason
+    reveals nothing to someone who does not already hold it."""
+    row = db.execute(
+        select(AuthToken).where(
+            AuthToken.token_hash == hash_token(raw), AuthToken.purpose == purpose
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        return _invalid_token()
+    if row.used_at is not None:
+        return AppError("This link was already used", status_code=400, code="TOKEN_ALREADY_USED")
+    if row.revoked_at is not None:
+        return AppError(
+            "This link was cancelled or replaced", status_code=400, code="TOKEN_REVOKED"
+        )
+    return AppError("This link has expired", status_code=400, code="TOKEN_EXPIRED")
 
 
 def _link(settings: Settings, path: str, raw: str) -> str:
@@ -573,3 +603,121 @@ def regenerate_recovery_codes(db: Session, settings: Settings, user: User, code:
     _audit(db, locked, "auth.mfa_recovery_codes_regenerated")
     db.commit()
     return codes
+
+
+# ------------------------------------------------------------ password change
+def change_password(
+    db: Session,
+    settings: Settings,
+    user: User,
+    session: AuthSession,
+    current_password: str,
+    new_password: str,
+) -> None:
+    """Authenticated password change. Other sessions of the account are revoked; this one stays."""
+    if user.password_hash is None or not verify_password(
+        settings, user.password_hash, current_password
+    ):
+        _audit(db, user, "auth.password_change_failed")
+        db.commit()
+        raise AppError(
+            "Current password is incorrect", status_code=400, code="INVALID_CURRENT_PASSWORD"
+        )
+    validate_password_policy(settings, new_password, user.email)
+    if verify_password(settings, user.password_hash, new_password):
+        raise AppError(
+            "The new password must differ from the current one",
+            status_code=422,
+            code="PASSWORD_UNCHANGED",
+        )
+    user.password_hash = hash_password(settings, new_password)
+    db.execute(
+        update(AuthSession)
+        .where(
+            AuthSession.user_id == user.id,
+            AuthSession.id != session.id,
+            AuthSession.revoked_at.is_(None),
+        )
+        .values(revoked_at=utcnow(), revoked_reason="password_changed")
+    )
+    _audit(db, user, "auth.password_changed")
+    db.commit()
+
+
+# ------------------------------------------------------- invitation lifecycle
+def invitation_state(db: Session, user: User) -> str:
+    """none | pending | expired | revoked | accepted for the user's latest invitation."""
+    if user.status is not UserStatus.INVITED:
+        return "accepted" if user.status is UserStatus.ACTIVE else "none"
+    row = db.execute(
+        select(AuthToken)
+        .where(AuthToken.user_id == user.id, AuthToken.purpose == TokenPurpose.INVITATION)
+        .order_by(AuthToken.created_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    if row is None:
+        return "none"
+    if row.used_at is not None:
+        return "accepted"
+    if row.revoked_at is not None:
+        return "revoked"
+    return "expired" if row.expires_at <= utcnow() else "pending"
+
+
+def resend_invitation(db: Session, settings: Settings, actor: User, user: User) -> None:
+    """Issue a fresh invitation link for an account that has not been activated. Caller commits."""
+    if user.status is not UserStatus.INVITED:
+        raise AppError(
+            "Only accounts that have not been activated can be re-invited",
+            status_code=409,
+            code="NOT_INVITED",
+        )
+    raw, token = _create_token(
+        db, user, TokenPurpose.INVITATION, timedelta(hours=settings.invitation_ttl_hours)
+    )
+    queue_notification(
+        db,
+        recipient=user.email,
+        kind=NotificationType.ACCOUNT,
+        template=TemplateKey.PARTNER_INVITATION,
+        context={"name": user.full_name, "link": _link(settings, "/activate", raw)},
+        dedupe_key=f"invite:{token.id}",
+    )
+    log_activity(
+        db,
+        "user",
+        user.id,
+        "auth.invitation_resent",
+        {},
+        ActorType.STAFF,
+        actor_user_id=actor.id,
+    )
+
+
+def revoke_invitation(db: Session, actor: User, user: User) -> None:
+    """Cancel every unused invitation link. The account stays un-activated and can be re-invited."""
+    if user.status is not UserStatus.INVITED:
+        raise AppError(
+            "Only accounts that have not been activated have an open invitation",
+            status_code=409,
+            code="NOT_INVITED",
+        )
+    db.execute(
+        update(AuthToken)
+        .where(
+            AuthToken.user_id == user.id,
+            AuthToken.purpose == TokenPurpose.INVITATION,
+            AuthToken.used_at.is_(None),
+            AuthToken.revoked_at.is_(None),
+        )
+        .values(revoked_at=utcnow())
+    )
+    log_activity(
+        db,
+        "user",
+        user.id,
+        "auth.invitation_revoked",
+        {},
+        ActorType.STAFF,
+        actor_user_id=actor.id,
+    )

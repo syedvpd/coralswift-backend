@@ -13,12 +13,13 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.common.utilities import utcnow
 from app.core.exceptions import AppError, NotFoundError
 from app.integrations.storage import Storage, StorageError
+from app.modules.admin import lookups
 from app.modules.admin.models import EnquiryFollowUp
 from app.modules.applications.constants import TERMINAL, PortalStatus
 from app.modules.applications.models import PortalApplication
@@ -35,6 +36,7 @@ from app.modules.notifications.constants import DeliveryStatus
 from app.modules.notifications.models import Notification
 from app.modules.organizations.models import PartnerOrganization
 from app.modules.partners.models import PartnerApplication
+from app.modules.projects.constants import ProjectCategory, category_group
 from app.modules.projects.models import ProjectEnquiry
 from app.modules.strategic.models import StrategicEnquiry
 
@@ -98,7 +100,33 @@ def apply_filters(
     q: str | None = None,
     created_from: datetime | None = None,
     created_to: datetime | None = None,
+    assigned_any: bool = False,
+    category: ProjectCategory | None = None,
+    project_group: str | None = None,
+    updated_from: datetime | None = None,
+    updated_to: datetime | None = None,
 ) -> Select[Enquiry, Contact, Company]:
+    if assigned_any:
+        stmt = stmt.where(Enquiry.assigned_user_id.is_not(None))
+    if category:
+        stmt = stmt.where(
+            exists().where(
+                ProjectEnquiry.enquiry_id == Enquiry.id,
+                ProjectEnquiry.project_category == category,
+            )
+        )
+    if project_group:
+        group = {c for c in ProjectCategory if category_group(c) == project_group}
+        stmt = stmt.where(
+            exists().where(
+                ProjectEnquiry.enquiry_id == Enquiry.id,
+                ProjectEnquiry.project_category.in_(group),
+            )
+        )
+    if updated_from:
+        stmt = stmt.where(Enquiry.updated_at >= updated_from)
+    if updated_to:
+        stmt = stmt.where(Enquiry.updated_at < updated_to)
     if enquiry_type:
         stmt = stmt.where(Enquiry.enquiry_type == enquiry_type)
     if status:
@@ -151,16 +179,57 @@ def row_dict(e: Enquiry, c: Contact, co: Company | None) -> dict[str, Any]:
         "assigned_user_id": e.assigned_user_id,
         "next_follow_up_at": e.next_follow_up_at,
         "created_at": e.created_at,
+        "updated_at": e.updated_at,
+        "contact_phone": c.phone,
+        "first_response_at": e.first_response_at,
+        "response_due_at": e.response_due_at,
     }
+
+
+def enrich_rows(db: Session, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Add owner names and the category (project category / strategic discussion type)."""
+    names = lookups.user_names(db, (r["assigned_user_id"] for r in rows))
+    ids = [r["id"] for r in rows]
+    cats: dict[uuid.UUID, str] = {}
+    if ids:
+        for eid, value in db.execute(
+            select(ProjectEnquiry.enquiry_id, ProjectEnquiry.project_category).where(
+                ProjectEnquiry.enquiry_id.in_(ids)
+            )
+        ):
+            cats[eid] = value.value
+        for eid, dtype in db.execute(
+            select(StrategicEnquiry.enquiry_id, StrategicEnquiry.discussion_type).where(
+                StrategicEnquiry.enquiry_id.in_(ids)
+            )
+        ):
+            cats[eid] = dtype.value
+    for r in rows:
+        r["assigned_user_name"] = (
+            names.get(r["assigned_user_id"]) if r["assigned_user_id"] else None
+        )
+        r["category"] = cats.get(r["id"])
+    return rows
+
+
+ENQUIRY_SORTS: dict[str, tuple[Any, ...]] = {
+    "-created_at": (Enquiry.created_at.desc(), Enquiry.id.desc()),
+    "created_at": (Enquiry.created_at.asc(), Enquiry.id.asc()),
+    "-updated_at": (Enquiry.updated_at.desc(), Enquiry.id.desc()),
+    "updated_at": (Enquiry.updated_at.asc(), Enquiry.id.asc()),
+    "next_follow_up_at": (Enquiry.next_follow_up_at.asc().nulls_last(), Enquiry.id.asc()),
+    "response_due_at": (Enquiry.response_due_at.asc().nulls_last(), Enquiry.id.asc()),
+}
 
 
 def list_enquiries(
     db: Session, staff: StaffContext, limit: int, offset: int, **filters: Any
 ) -> tuple[list[dict[str, Any]], int]:
+    sort = filters.pop("sort", "-created_at")
     stmt = apply_filters(enquiry_query(staff), **filters)
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
-    rows = db.execute(stmt.order_by(Enquiry.created_at.desc()).limit(limit).offset(offset)).all()
-    return [row_dict(*r) for r in rows], total
+    rows = db.execute(stmt.order_by(*ENQUIRY_SORTS[sort]).limit(limit).offset(offset)).all()
+    return enrich_rows(db, [row_dict(*r) for r in rows]), total
 
 
 def get_visible(
@@ -285,7 +354,7 @@ def enquiry_detail(db: Session, staff: StaffContext, enquiry_id: uuid.UUID) -> d
             for d in docs
             if _doc_allowed(staff, d.category.value if d.category else None)
         ],
-        "follow_ups": list_followups(db, e.id),
+        "follow_ups": followup_dicts(db, list_followups(db, e.id)),
     }
 
 
@@ -317,25 +386,22 @@ def update_enquiry(
     return e
 
 
+def _check_owner(db: Session, e: Enquiry, user_id: uuid.UUID | None) -> None:
+    if user_id is None:
+        return
+    owner = db.get(User, user_id)
+    allowed = {StaffRole.BUSINESS_DEVELOPMENT_MANAGER, StaffRole.SUPER_ADMINISTRATOR}
+    if e.enquiry_type is EnquiryType.STRATEGIC:
+        allowed = {StaffRole.SUPER_ADMINISTRATOR}  # confidential records: super administrators only
+    if owner is None or owner.status is not UserStatus.ACTIVE or owner.staff_role not in allowed:
+        raise AppError("Not a valid owner for this enquiry", status_code=422, code="INVALID_OWNER")
+
+
 def assign_enquiry(
     db: Session, staff: StaffContext, enquiry_id: uuid.UUID, user_id: uuid.UUID | None
 ) -> Enquiry:
     e = get_visible(db, staff, enquiry_id, lock=True)
-    if user_id is not None:
-        owner = db.get(User, user_id)
-        allowed = {StaffRole.BUSINESS_DEVELOPMENT_MANAGER, StaffRole.SUPER_ADMINISTRATOR}
-        if e.enquiry_type is EnquiryType.STRATEGIC:
-            allowed = {
-                StaffRole.SUPER_ADMINISTRATOR
-            }  # confidential records: super administrators only
-        if (
-            owner is None
-            or owner.status is not UserStatus.ACTIVE
-            or owner.staff_role not in allowed
-        ):
-            raise AppError(
-                "Not a valid owner for this enquiry", status_code=422, code="INVALID_OWNER"
-            )
+    _check_owner(db, e, user_id)
     previous = e.assigned_user_id
     e.assigned_user_id = user_id
     _audit(
@@ -367,21 +433,41 @@ def list_followups(db: Session, enquiry_id: uuid.UUID) -> list[EnquiryFollowUp]:
 def _recompute_next(db: Session, e: Enquiry) -> None:
     e.next_follow_up_at = db.execute(
         select(func.min(EnquiryFollowUp.due_at)).where(
-            EnquiryFollowUp.enquiry_id == e.id, EnquiryFollowUp.completed_at.is_(None)
+            EnquiryFollowUp.enquiry_id == e.id,
+            EnquiryFollowUp.completed_at.is_(None),
+            EnquiryFollowUp.cancelled_at.is_(None),
         )
     ).scalar_one()
 
 
 def add_followup(
-    db: Session, staff: StaffContext, enquiry_id: uuid.UUID, note: str, due_at: datetime | None
+    db: Session,
+    staff: StaffContext,
+    enquiry_id: uuid.UUID,
+    note: str,
+    due_at: datetime | None,
+    kind: str = "follow_up",
+    assignee_id: uuid.UUID | None = None,
 ) -> EnquiryFollowUp:
     e = get_visible(db, staff, enquiry_id, lock=True)
+    if due_at is not None and kind != "follow_up":
+        raise AppError(
+            "Only follow-ups have a due date", status_code=422, code="DUE_DATE_NOT_ALLOWED"
+        )
+    _check_owner(db, e, assignee_id)
     f = EnquiryFollowUp(
-        enquiry_id=e.id, author_id=staff.user.id, note=note, due_at=due_at, created_at=utcnow()
+        enquiry_id=e.id,
+        author_id=staff.user.id,
+        note=note,
+        due_at=due_at,
+        kind=kind,
+        assignee_id=assignee_id,
+        created_at=utcnow(),
     )
     db.add(f)
     db.flush()
-    mark_response(e)
+    if kind != "note":  # an internal note is not a response to the requester
+        mark_response(e)
     _recompute_next(db, e)
     _audit(
         db,
@@ -389,10 +475,211 @@ def add_followup(
         "enquiry",
         e.id,
         "admin.followup_added",
-        {"followup_id": str(f.id), "due": due_at is not None},
+        {"followup_id": str(f.id), "kind": kind, "due": due_at is not None},
     )
     db.commit()
     return f
+
+
+def _open_followup(db: Session, e: Enquiry, followup_id: uuid.UUID) -> EnquiryFollowUp:
+    f = db.execute(
+        select(EnquiryFollowUp)
+        .where(EnquiryFollowUp.id == followup_id, EnquiryFollowUp.enquiry_id == e.id)
+        .with_for_update()
+    ).scalar_one_or_none()
+    if f is None:
+        raise NotFoundError("Follow-up not found")
+    if f.completed_at is not None or f.cancelled_at is not None:
+        raise AppError(
+            "Only open follow-ups can be changed", status_code=409, code="FOLLOWUP_CLOSED"
+        )
+    return f
+
+
+def update_followup(
+    db: Session,
+    staff: StaffContext,
+    enquiry_id: uuid.UUID,
+    followup_id: uuid.UUID,
+    changes: dict[str, Any],
+) -> EnquiryFollowUp:
+    e = get_visible(db, staff, enquiry_id, lock=True)
+    f = _open_followup(db, e, followup_id)
+    if "due_at" in changes and changes["due_at"] is not None and f.kind != "follow_up":
+        raise AppError(
+            "Only follow-ups have a due date", status_code=422, code="DUE_DATE_NOT_ALLOWED"
+        )
+    if changes.get("note") is None:
+        changes.pop("note", None)  # the note cannot be cleared
+    if "assignee_id" in changes:
+        _check_owner(db, e, changes["assignee_id"])
+    for name, value in changes.items():
+        setattr(f, name, value)
+    db.flush()
+    _recompute_next(db, e)
+    _audit(
+        db,
+        staff,
+        "enquiry",
+        e.id,
+        "admin.followup_updated",
+        {"followup_id": str(f.id), "fields": sorted(changes)},
+    )
+    db.commit()
+    return f
+
+
+def cancel_followup(
+    db: Session, staff: StaffContext, enquiry_id: uuid.UUID, followup_id: uuid.UUID
+) -> EnquiryFollowUp:
+    e = get_visible(db, staff, enquiry_id, lock=True)
+    f = _open_followup(db, e, followup_id)
+    f.cancelled_at = utcnow()
+    db.flush()
+    _recompute_next(db, e)
+    _audit(db, staff, "enquiry", e.id, "admin.followup_cancelled", {"followup_id": str(f.id)})
+    db.commit()
+    return f
+
+
+def followup_dicts(
+    db: Session, rows: list[EnquiryFollowUp], refs: dict[uuid.UUID, str] | None = None
+) -> list[dict[str, Any]]:
+    names = lookups.user_names(db, [x for f in rows for x in (f.author_id, f.assignee_id)])
+    return [
+        {
+            "id": f.id,
+            "author_id": f.author_id,
+            "note": f.note,
+            "due_at": f.due_at,
+            "completed_at": f.completed_at,
+            "created_at": f.created_at,
+            "kind": f.kind,
+            "status": f.status,
+            "cancelled_at": f.cancelled_at,
+            "assignee_id": f.assignee_id,
+            "author_name": names.get(f.author_id),
+            "assignee_name": names.get(f.assignee_id) if f.assignee_id else None,
+            "enquiry_id": f.enquiry_id,
+            "enquiry_reference": (refs or {}).get(f.enquiry_id),
+        }
+        for f in rows
+    ]
+
+
+def list_all_followups(
+    db: Session,
+    staff: StaffContext,
+    limit: int,
+    offset: int,
+    *,
+    status: str | None,
+    kind: str | None,
+    assignee_id: uuid.UUID | None,
+    mine: bool,
+    due_from: datetime | None,
+    due_to: datetime | None,
+    sort_desc: bool,
+) -> tuple[list[dict[str, Any]], int, dict[str, int]]:
+    """Follow-ups across every enquiry this staff member may see, with open/overdue counts."""
+    base = (
+        select(EnquiryFollowUp, Enquiry.reference_number)
+        .join(Enquiry, Enquiry.id == EnquiryFollowUp.enquiry_id)
+        .where(Enquiry.enquiry_type.in_(visible_types(staff)))
+    )
+    now = utcnow()
+    open_ = (EnquiryFollowUp.completed_at.is_(None), EnquiryFollowUp.cancelled_at.is_(None))
+    counts_src = base.subquery()
+    c = counts_src.c
+    counts = {
+        "open": db.execute(
+            select(func.count())
+            .select_from(counts_src)
+            .where(c.completed_at.is_(None), c.cancelled_at.is_(None))
+        ).scalar_one(),
+        "overdue": db.execute(
+            select(func.count())
+            .select_from(counts_src)
+            .where(c.completed_at.is_(None), c.cancelled_at.is_(None), c.due_at < now)
+        ).scalar_one(),
+        "upcoming": db.execute(
+            select(func.count())
+            .select_from(counts_src)
+            .where(c.completed_at.is_(None), c.cancelled_at.is_(None), c.due_at >= now)
+        ).scalar_one(),
+        "completed": db.execute(
+            select(func.count()).select_from(counts_src).where(c.completed_at.is_not(None))
+        ).scalar_one(),
+        "cancelled": db.execute(
+            select(func.count()).select_from(counts_src).where(c.cancelled_at.is_not(None))
+        ).scalar_one(),
+    }
+    stmt = base
+    if status == "open":
+        stmt = stmt.where(*open_)
+    elif status == "completed":
+        stmt = stmt.where(EnquiryFollowUp.completed_at.is_not(None))
+    elif status == "cancelled":
+        stmt = stmt.where(EnquiryFollowUp.cancelled_at.is_not(None))
+    if kind:
+        stmt = stmt.where(EnquiryFollowUp.kind == kind)
+    if assignee_id:
+        stmt = stmt.where(EnquiryFollowUp.assignee_id == assignee_id)
+    if mine:
+        stmt = stmt.where(
+            or_(
+                EnquiryFollowUp.assignee_id == staff.user.id,
+                EnquiryFollowUp.author_id == staff.user.id,
+            )
+        )
+    if due_from:
+        stmt = stmt.where(EnquiryFollowUp.due_at >= due_from)
+    if due_to:
+        stmt = stmt.where(EnquiryFollowUp.due_at < due_to)
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    order = (
+        (EnquiryFollowUp.due_at.desc().nulls_last(), EnquiryFollowUp.id.desc())
+        if sort_desc
+        else (EnquiryFollowUp.due_at.asc().nulls_last(), EnquiryFollowUp.id.asc())
+    )
+    rows = db.execute(stmt.order_by(*order).limit(limit).offset(offset)).all()
+    refs = {f.enquiry_id: ref for f, ref in rows}
+    return followup_dicts(db, [f for f, _ in rows], refs), total, counts
+
+
+def enquiry_activity(
+    db: Session,
+    staff: StaffContext,
+    enquiry_id: uuid.UUID,
+    limit: int,
+    offset: int,
+    action: str | None,
+) -> tuple[list[dict[str, Any]], int]:
+    e = get_visible(db, staff, enquiry_id)  # same visibility rule as the enquiry itself
+    stmt = select(Activity).where(Activity.record_type == "enquiry", Activity.record_id == e.id)
+    if action:
+        stmt = stmt.where(Activity.action.ilike(_like(action), escape="\\"))
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    acts = list(
+        db.execute(
+            stmt.order_by(Activity.created_at.desc(), Activity.id.desc())
+            .limit(limit)
+            .offset(offset)
+        ).scalars()
+    )
+    names = lookups.user_names(db, (a.actor_user_id for a in acts))
+    return [
+        {
+            "id": a.id,
+            "action": a.action,
+            "actor_type": a.actor_type.value,
+            "actor_user_id": a.actor_user_id,
+            "actor_name": names.get(a.actor_user_id) if a.actor_user_id else None,
+            "meta": a.meta,
+            "created_at": a.created_at,
+        }
+        for a in acts
+    ], total
 
 
 def complete_followup(
@@ -440,20 +727,38 @@ def download_document(
 
 
 # --------------------------------------------------------------- organizations
+ORG_SORTS: dict[str, tuple[Any, ...]] = {
+    "-created_at": (PartnerOrganization.created_at.desc(), PartnerOrganization.id.desc()),
+    "created_at": (PartnerOrganization.created_at.asc(), PartnerOrganization.id.asc()),
+    "-updated_at": (PartnerOrganization.updated_at.desc(), PartnerOrganization.id.desc()),
+    "legal_name": (PartnerOrganization.legal_name.asc(), PartnerOrganization.id.asc()),
+}
+
+
 def list_orgs(
-    db: Session, limit: int, offset: int, q: str | None, status: str | None
+    db: Session,
+    limit: int,
+    offset: int,
+    q: str | None,
+    status: str | None,
+    country: str | None = None,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
+    sort: str = "-created_at",
 ) -> tuple[list[dict[str, Any]], int]:
     stmt = select(PartnerOrganization)
+    if country:
+        stmt = stmt.where(PartnerOrganization.country == country)
+    if created_from:
+        stmt = stmt.where(PartnerOrganization.created_at >= created_from)
+    if created_to:
+        stmt = stmt.where(PartnerOrganization.created_at < created_to)
     if q:
         stmt = stmt.where(PartnerOrganization.legal_name.ilike(_like(q.strip()), escape="\\"))
     if status:
         stmt = stmt.where(PartnerOrganization.status == status)
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
-    orgs = list(
-        db.execute(
-            stmt.order_by(PartnerOrganization.created_at.desc()).limit(limit).offset(offset)
-        ).scalars()
-    )
+    orgs = list(db.execute(stmt.order_by(*ORG_SORTS[sort]).limit(limit).offset(offset)).scalars())
     open_status = dict(
         db.execute(
             select(PortalApplication.organization_id, PortalApplication.status).where(
@@ -470,6 +775,8 @@ def list_orgs(
             "country": o.country,
             "created_at": o.created_at,
             "open_application_status": open_status[o.id].value if o.id in open_status else None,
+            "updated_at": o.updated_at,
+            "primary_contact": o.authorized_contacts[0] if o.authorized_contacts else None,
         }
         for o in orgs
     ], total
@@ -543,11 +850,39 @@ def set_org_status(
 
 
 # ------------------------------------------------------------------ staff users
-def list_staff(db: Session, role: StaffRole | None) -> list[User]:
+STAFF_SORTS: dict[str, tuple[Any, ...]] = {
+    "created_at": (User.created_at.asc(), User.id.asc()),
+    "-created_at": (User.created_at.desc(), User.id.desc()),
+    "full_name": (User.full_name.asc(), User.id.asc()),
+    "-last_login_at": (User.last_login_at.desc().nulls_last(), User.id.desc()),
+}
+
+
+def list_staff(
+    db: Session,
+    role: StaffRole | None,
+    *,
+    q: str | None = None,
+    status: UserStatus | None = None,
+    sort: str = "created_at",
+    limit: int | None = None,
+    offset: int = 0,
+) -> tuple[list[User], int]:
     stmt = select(User).where(User.user_type == UserType.STAFF)
     if role:
         stmt = stmt.where(User.staff_role == role)
-    return list(db.execute(stmt.order_by(User.created_at)).scalars())
+    if status:
+        stmt = stmt.where(User.status == status)
+    if q:
+        pattern = _like(q.strip())
+        stmt = stmt.where(
+            or_(User.email.ilike(pattern, escape="\\"), User.full_name.ilike(pattern, escape="\\"))
+        )
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    stmt = stmt.order_by(*STAFF_SORTS[sort]).offset(offset)
+    if limit is not None:
+        stmt = stmt.limit(limit)
+    return list(db.execute(stmt).scalars()), total
 
 
 def _active_super_admins(db: Session) -> int:
@@ -637,8 +972,17 @@ def list_audit(
     organization_id: uuid.UUID | None,
     created_from: datetime | None,
     created_to: datetime | None,
+    q: str | None = None,
+    ascending: bool = False,
 ) -> tuple[list[Activity], int]:
     stmt = select(Activity)
+    if q:
+        stmt = stmt.where(
+            or_(
+                Activity.action.ilike(_like(q), escape="\\"),
+                Activity.record_type.ilike(_like(q), escape="\\"),
+            )
+        )
     if record_type:
         stmt = stmt.where(Activity.record_type == record_type)
     if action:
@@ -652,9 +996,13 @@ def list_audit(
     if created_to:
         stmt = stmt.where(Activity.created_at < created_to)
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
-    return list(
-        db.execute(stmt.order_by(Activity.created_at.desc()).limit(limit).offset(offset)).scalars()
-    ), total
+    # id is the tie-breaker so pages are stable when rows share a timestamp
+    order = (
+        (Activity.created_at.asc(), Activity.id.asc())
+        if ascending
+        else (Activity.created_at.desc(), Activity.id.desc())
+    )
+    return list(db.execute(stmt.order_by(*order).limit(limit).offset(offset)).scalars()), total
 
 
 def overview(db: Session, staff: StaffContext) -> dict[str, Any]:
@@ -738,9 +1086,10 @@ def _safe(value: Any) -> Any:
 
 
 def enquiries_csv(db: Session, staff: StaffContext, **filters: Any) -> str:
+    sort = filters.pop("sort", "created_at")  # same filters as the list; the export is capped
     stmt = (
         apply_filters(enquiry_query(staff), **filters)
-        .order_by(Enquiry.created_at)
+        .order_by(*ENQUIRY_SORTS[sort if sort in ENQUIRY_SORTS else "created_at"])
         .limit(MAX_EXPORT_ROWS)
     )
     buf = io.StringIO()

@@ -10,11 +10,13 @@ from app.core.exceptions import AppError, NotFoundError
 from app.core.protection import client_ip, rate_limit
 from app.database.dependencies import DbSession
 from app.modules.auth import service
-from app.modules.auth.constants import UserType
+from app.modules.auth.constants import StaffRole, UserType
 from app.modules.auth.dependencies import AuthDep, PendingAuthDep
 from app.modules.auth.models import AuthSession
+from app.modules.auth.permissions import permissions_for, role_matrix
 from app.modules.auth.schemas import (
     AcceptInvitationIn,
+    ChangePasswordIn,
     LoginIn,
     MeOut,
     MfaCodeIn,
@@ -150,6 +152,39 @@ def password_reset_confirm(
 ) -> ApiResponse[None]:
     service.confirm_password_reset(db, settings, payload.token, payload.new_password)
     return ok(None, "Password updated")
+
+
+@router.post(
+    "/change-password",
+    response_model=ApiResponse[None],
+    dependencies=AUTH_LIMIT,
+    responses={
+        400: {"model": ErrorResponse},
+        401: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
+    summary="Change your own password (staff and partners); your other sessions are signed out",
+)
+def change_password(
+    payload: ChangePasswordIn, auth: AuthDep, db: DbSession, settings: SettingsDep
+) -> ApiResponse[None]:
+    service.change_password(
+        db, settings, auth.user, auth.session, payload.current_password, payload.new_password
+    )
+    return ok(None, "Password updated")
+
+
+@router.get(
+    "/permissions",
+    response_model=ApiResponse[dict[str, Any]],
+    responses=_ERR,
+    summary="Endpoints this account may call, derived from the live route guards",
+)
+def my_permissions(auth: AuthDep, request: Request) -> ApiResponse[dict[str, Any]]:
+    data = permissions_for(request.app, auth.user.user_type, auth.user.staff_role)
+    if auth.user.staff_role is StaffRole.SUPER_ADMINISTRATOR:
+        data["role_matrix"] = role_matrix(request.app)
+    return ok(data)
 
 
 @router.get("/me", response_model=ApiResponse[MeOut], responses=_ERR, summary="Current account")

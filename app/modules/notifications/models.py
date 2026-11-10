@@ -32,6 +32,7 @@ class Notification(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     provider_reference: Mapped[str | None] = mapped_column(String(120))
     last_error: Mapped[str | None] = mapped_column(String(300))
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # in-app read state
     # enquiry + template + recipient: a retry of the same logical email can never be queued twice.
     dedupe_key: Mapped[str] = mapped_column(String(320), unique=True)
 

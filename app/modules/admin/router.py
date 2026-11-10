@@ -3,7 +3,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
 
@@ -11,7 +11,7 @@ from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
 from app.core.config import Settings, get_settings
 from app.database.dependencies import DbSession
-from app.modules.admin import service
+from app.modules.admin import lookups, service
 from app.modules.admin.schemas import (
     AssignIn,
     AuditRow,
@@ -28,12 +28,13 @@ from app.modules.admin.schemas import (
 )
 from app.modules.applications.constants import PortalStatus
 from app.modules.auth import service as auth_service
-from app.modules.auth.constants import StaffRole
+from app.modules.auth.constants import StaffRole, UserStatus
 from app.modules.auth.dependencies import StaffContext, SuperAdminDep, require_staff
 from app.modules.auth.models import User
 from app.modules.enquiries.constants import EnquiryStatus, EnquiryType, Priority
 from app.modules.enquiries.models import Enquiry
 from app.modules.notifications.service import dispatch_notifications
+from app.modules.projects.constants import ProjectCategory
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -69,6 +70,22 @@ class EnquiryFilters:
         ] = None,
         created_from: Annotated[datetime | None, Query()] = None,
         created_to: Annotated[datetime | None, Query()] = None,
+        assigned_any: Annotated[bool, Query(description="Has an owner")] = False,
+        category: Annotated[ProjectCategory | None, Query(description="Project category")] = None,
+        project_group: Annotated[Literal["it", "non_it"] | None, Query()] = None,
+        updated_from: Annotated[datetime | None, Query()] = None,
+        updated_to: Annotated[datetime | None, Query()] = None,
+        sort: Annotated[
+            Literal[
+                "-created_at",
+                "created_at",
+                "-updated_at",
+                "updated_at",
+                "next_follow_up_at",
+                "response_due_at",
+            ],
+            Query(),
+        ] = "-created_at",
     ) -> None:
         self.values: dict[str, Any] = {
             "enquiry_type": type,
@@ -81,6 +98,12 @@ class EnquiryFilters:
             "q": q,
             "created_from": created_from,
             "created_to": created_to,
+            "assigned_any": assigned_any,
+            "category": category,
+            "project_group": project_group,
+            "updated_from": updated_from,
+            "updated_to": updated_to,
+            "sort": sort,
         }
 
 
@@ -122,7 +145,7 @@ def enquiry_detail(
 def _row(db: DbSession, staff: StaffContext, enquiry_id: uuid.UUID) -> EnquiryRow:
     e = service.get_visible(db, staff, enquiry_id)
     stmt = service.enquiry_query(staff).where(Enquiry.id == e.id)
-    return EnquiryRow(**service.row_dict(*db.execute(stmt).one()))
+    return EnquiryRow(**service.enrich_rows(db, [service.row_dict(*db.execute(stmt).one())])[0])
 
 
 @router.patch(
@@ -161,8 +184,10 @@ def assign(
 def add_followup(
     enquiry_id: uuid.UUID, payload: FollowUpIn, staff: AdminDep, db: DbSession
 ) -> ApiResponse[FollowUpOut]:
-    f = service.add_followup(db, staff, enquiry_id, payload.note, payload.due_at)
-    return ok(FollowUpOut.model_validate(f, from_attributes=True))
+    f = service.add_followup(
+        db, staff, enquiry_id, payload.note, payload.due_at, payload.kind, payload.assignee_id
+    )
+    return ok(FollowUpOut(**service.followup_dicts(db, [f])[0]))
 
 
 @router.post(
@@ -214,8 +239,24 @@ def list_orgs(
     page: PageDep,
     q: Annotated[str | None, Query(max_length=100)] = None,
     status: Annotated[str | None, Query(pattern="^(active|suspended)$")] = None,
+    country: Annotated[str | None, Query(max_length=2, description="ISO 3166-1 alpha-2")] = None,
+    created_from: Annotated[datetime | None, Query()] = None,
+    created_to: Annotated[datetime | None, Query()] = None,
+    sort: Annotated[
+        Literal["-created_at", "created_at", "-updated_at", "legal_name"], Query()
+    ] = "-created_at",
 ) -> ApiResponse[list[OrgRow]]:
-    rows, total = service.list_orgs(db, page.page_size, page.offset, q, status)
+    rows, total = service.list_orgs(
+        db,
+        page.page_size,
+        page.offset,
+        q,
+        status,
+        country=country.upper() if country else None,
+        created_from=created_from,
+        created_to=created_to,
+        sort=sort,
+    )
     return ok([OrgRow(**r) for r in rows], meta=page_meta(page, total))
 
 
@@ -252,6 +293,8 @@ def _staff_out(u: User) -> StaffOut:
         status=u.status.value,
         mfa_enabled=u.mfa_enabled_at is not None,
         last_login_at=u.last_login_at,
+        created_at=u.created_at,
+        updated_at=u.updated_at,
     )
 
 
@@ -262,9 +305,20 @@ def _staff_out(u: User) -> StaffOut:
     summary="Staff accounts (super administrator)",
 )
 def list_staff(
-    staff: SuperAdminDep, db: DbSession, role: Annotated[StaffRole | None, Query()] = None
+    staff: SuperAdminDep,
+    db: DbSession,
+    page: PageDep,
+    role: Annotated[StaffRole | None, Query()] = None,
+    q: Annotated[str | None, Query(max_length=100, description="email or name")] = None,
+    status: Annotated[UserStatus | None, Query()] = None,
+    sort: Annotated[
+        Literal["created_at", "-created_at", "full_name", "-last_login_at"], Query()
+    ] = "created_at",
 ) -> ApiResponse[list[StaffOut]]:
-    return ok([_staff_out(u) for u in service.list_staff(db, role)])
+    users, total = service.list_staff(
+        db, role, q=q, status=status, sort=sort, limit=page.page_size, offset=page.offset
+    )
+    return ok([_staff_out(u) for u in users], meta=page_meta(page, total))
 
 
 @router.post(
@@ -336,6 +390,10 @@ def audit(
     organization_id: Annotated[uuid.UUID | None, Query()] = None,
     created_from: Annotated[datetime | None, Query()] = None,
     created_to: Annotated[datetime | None, Query()] = None,
+    q: Annotated[
+        str | None, Query(max_length=80, description="Partial match on action or record type")
+    ] = None,
+    sort: Annotated[Literal["created_at", "-created_at"], Query()] = "-created_at",
 ) -> ApiResponse[list[AuditRow]]:
     rows, total = service.list_audit(
         db,
@@ -347,6 +405,12 @@ def audit(
         organization_id=organization_id,
         created_from=created_from,
         created_to=created_to,
+        q=q,
+        ascending=sort == "created_at",
+    )
+    names = lookups.user_names(db, (a.actor_user_id for a in rows))
+    strategic = lookups.strategic_enquiry_ids(
+        db, (a.record_id for a in rows if a.record_type == "enquiry")
     )
     return ok(
         [
@@ -361,6 +425,8 @@ def audit(
                 request_id=a.request_id,
                 meta=a.meta,
                 created_at=a.created_at,
+                actor_name=names.get(a.actor_user_id) if a.actor_user_id else None,
+                is_strategic=a.record_type == "enquiry" and a.record_id in strategic,
             )
             for a in rows
         ],

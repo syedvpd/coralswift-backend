@@ -47,8 +47,22 @@ def get_reviewable(
 
 
 def assign(
-    db: Session, staff: StaffContext, app: PortalApplication, reviewer_id: uuid.UUID
+    db: Session, staff: StaffContext, app: PortalApplication, reviewer_id: uuid.UUID | None
 ) -> None:
+    if reviewer_id is None:
+        previous_id = app.assigned_reviewer_id
+        app.assigned_reviewer_id = None
+        log_activity(
+            db,
+            "portal_application",
+            app.id,
+            "application.reviewer_cleared",
+            {"previous": str(previous_id) if previous_id else None},
+            ActorType.REVIEWER,
+            actor_user_id=staff.user.id,
+            organization_id=app.organization_id,
+        )
+        return
     reviewer = db.get(User, reviewer_id)
     if (
         reviewer is None
