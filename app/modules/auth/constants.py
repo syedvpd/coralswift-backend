@@ -19,6 +19,7 @@ class UserStatus(enum.StrEnum):
     INVITED = "invited"
     ACTIVE = "active"
     DEACTIVATED = "deactivated"
+    SUSPENDED = "suspended"  # set by admin "suspend"; reactivation is an admin action
 
 
 class TokenPurpose(enum.StrEnum):

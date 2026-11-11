@@ -1072,7 +1072,14 @@ def change_role(db: Session, staff: StaffContext, user_id: uuid.UUID, role: Staf
     return u
 
 
-def set_staff_active(db: Session, staff: StaffContext, user_id: uuid.UUID, active: bool) -> User:
+def set_staff_active(
+    db: Session,
+    staff: StaffContext,
+    user_id: uuid.UUID,
+    active: bool,
+    *,
+    suspend: bool = False,
+) -> User:
     u = _staff(db, user_id)
     if u.id == staff.user.id:
         raise AppError("You cannot change your own status", status_code=409, code="SELF_CHANGE")
@@ -1087,8 +1094,8 @@ def set_staff_active(db: Session, staff: StaffContext, user_id: uuid.UUID, activ
                 status_code=409,
                 code="LAST_SUPER_ADMIN",
             )
-        u.status = UserStatus.DEACTIVATED
-        auth_service.revoke_all_sessions(db, u.id, "deactivated")
+        u.status = UserStatus.SUSPENDED if suspend else UserStatus.DEACTIVATED
+        auth_service.revoke_all_sessions(db, u.id, "suspended" if suspend else "deactivated")
     elif u.password_hash is not None:
         u.status = UserStatus.ACTIVE
     else:

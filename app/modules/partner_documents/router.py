@@ -9,6 +9,7 @@ from app.core.config import Settings, get_settings
 from app.core.protection import rate_limit
 from app.database.dependencies import DbSession
 from app.modules.auth.dependencies import PartnerDep
+from app.modules.documents.audit import audit_denied_download
 from app.modules.enquiries.constants import ActorType
 from app.modules.partner_documents import requests, service
 from app.modules.partner_documents.constants import PartnerDocCategory
@@ -132,15 +133,22 @@ def download(
     db: DbSession,
     version: Annotated[int | None, Query(ge=1)] = None,
 ) -> Response:
-    doc = service.get_owned(db, ctx.organization_id, document_id)
-    data, ver = service.read_version(
+    with audit_denied_download(
         db,
-        request.app.state.storage,
-        doc,
-        version,
+        document_id,
         actor_type=ActorType.PARTNER,
         actor_user_id=ctx.user.id,
-    )
+        organization_id=ctx.organization_id,
+    ):
+        doc = service.get_owned(db, ctx.organization_id, document_id)
+        data, ver = service.read_version(
+            db,
+            request.app.state.storage,
+            doc,
+            version,
+            actor_type=ActorType.PARTNER,
+            actor_user_id=ctx.user.id,
+        )
     return Response(
         content=data,
         media_type=ver.content_type,

@@ -449,13 +449,13 @@ def suspend(user_id: uuid.UUID, staff: SuperAdminDep, db: DbSession) -> ApiRespo
     if user.user_type is UserType.STAFF:
         from app.modules.admin import service  # staff rules: last super administrator
 
-        user = service.set_staff_active(db, staff, user_id, False)
+        user = service.set_staff_active(db, staff, user_id, False, suspend=True)
     else:
-        if user.status is UserStatus.DEACTIVATED:
+        if user.status in (UserStatus.DEACTIVATED, UserStatus.SUSPENDED):
             raise AppError(
                 "Account is already suspended", status_code=409, code="ALREADY_SUSPENDED"
             )
-        user.status = UserStatus.DEACTIVATED
+        user.status = UserStatus.SUSPENDED
         auth_service.revoke_all_sessions(db, user.id, "suspended")
         log_activity(
             db,
@@ -478,7 +478,7 @@ def suspend(user_id: uuid.UUID, staff: SuperAdminDep, db: DbSession) -> ApiRespo
 )
 def reactivate(user_id: uuid.UUID, staff: SuperAdminDep, db: DbSession) -> ApiResponse[AccountOut]:
     user = _account(db, user_id)
-    if user.status is not UserStatus.DEACTIVATED:
+    if user.status not in (UserStatus.DEACTIVATED, UserStatus.SUSPENDED):
         raise AppError(
             "Only suspended accounts can be reactivated", status_code=409, code="NOT_SUSPENDED"
         )

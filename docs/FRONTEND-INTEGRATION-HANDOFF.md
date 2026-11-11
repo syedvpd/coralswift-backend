@@ -48,3 +48,9 @@ Every document payload carries `scan_status`, always `not_scanned` today, and `u
 - `scan_status` values: `not_scanned` (no scanner, quarantine-only), `scan_pending`, `clean`, `infected`, `scan_failed`. When the scanner is active only `clean` files can be downloaded or reviewed (404 on download, 409 `SCAN_REQUIRED` on review). Active today: NO (needs `SCANNER_BACKEND=clamav` and a clamd service).
 - Security policy write: `PUT /admin/settings/security.login_max_failures` (3-20) and `security.login_lockout_minutes` (1-1440), super administrator only.
 - Full status per original bullet: `docs/ACCEPTANCE-STATUS.md`.
+
+## Last additions
+- Login: 403 `ACCOUNT_SUSPENDED` (admin suspend; user status `suspended`) is separate from 403 `ACCOUNT_DEACTIVATED`; both appear only after the correct password. `UserStatus` is now `invited | active | deactivated | suspended`.
+- Escalation: still no first response 48 h after creation -> one escalation notification (setting `sla_escalation.<queue>` overrides 48 h). First-response target stays 24 h (`sla.<queue>`).
+- Security policy settings (super admin, `PUT /admin/settings/{key}`): `security.login_max_failures` 3-20, `security.login_lockout_minutes` 1-1440, `security.password_min_length` 8-128, `security.access_token_minutes` 5-1440, `security.refresh_token_minutes` 60-43200, `security.invitation_ttl_hours` 1-720, `security.reset_ttl_minutes` 5-1440.
+- Refused document downloads (403/404/409) are audited as `document.download_denied` (outcome `failure`, no file or owner data).

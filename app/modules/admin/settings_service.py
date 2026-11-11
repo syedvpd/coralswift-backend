@@ -113,6 +113,11 @@ REGISTRY: dict[str, Callable[[str], str]] = {
     "ack_promise_enabled": _bool,  # s.28: acknowledgement wording may promise the SLA only if true
     # Security policy (write): overrides the environment defaults at runtime, super admin only
     "security.login_max_failures": _int(3, 20),
+    "security.password_min_length": _int(8, 128),
+    "security.access_token_minutes": _int(5, 1440),
+    "security.refresh_token_minutes": _int(60, 43200),
+    "security.invitation_ttl_hours": _int(1, 720),
+    "security.reset_ttl_minutes": _int(5, 1440),
     "security.login_lockout_minutes": _int(1, 1440),
     "retention.partner_document_days": _int(1, 3650),
     **{f"required_documents.{p.value}": _categories for p in EngagementPathway},

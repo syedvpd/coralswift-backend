@@ -141,7 +141,12 @@ def test_escalation_and_first_response(
     for _ in range(2):
         client.post("/api/v1/enquiries/contact", json=factories.contact())
     rows = list(db.execute(select(Enquiry).order_by(Enquiry.created_at)).scalars())
-    db.execute(update(Enquiry).values(response_due_at=utcnow() - timedelta(hours=1)))
+    db.execute(
+        update(Enquiry).values(
+            response_due_at=utcnow() - timedelta(hours=1),
+            created_at=utcnow() - timedelta(hours=49),  # past the 48 h escalation target
+        )
+    )
     db.commit()
     assert client.get(f"{ADM}/enquiries?sla_breached=true", headers=sa).json()["meta"]["total"] == 2
     client.post(

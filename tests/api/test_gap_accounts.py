@@ -193,12 +193,12 @@ def test_suspend_reactivate_and_admin_reset(
     assert client.post(f"{ADM}/accounts/{pid}/password-reset", headers=sa).status_code == 200
     assert "/reset-password?token=" in email.sent[-1].text
     done = client.post(f"{ADM}/accounts/{pid}/suspend", headers=sa)
-    assert done.status_code == 200 and done.json()["data"]["status"] == "deactivated"
+    assert done.status_code == 200 and done.json()["data"]["status"] == "suspended"
     assert (
         client.get(f"{A}/me", headers=partner.headers).status_code == 401
     )  # signed out everywhere
     gone = client.post(f"{A}/login", json={"email": partner.email, "password": PASSWORD})
-    assert gone.status_code == 403 and gone.json()["error"]["code"] == "ACCOUNT_DEACTIVATED"
+    assert gone.status_code == 403 and gone.json()["error"]["code"] == "ACCOUNT_SUSPENDED"
     twice = client.post(f"{ADM}/accounts/{pid}/suspend", headers=sa)
     assert twice.status_code == 409
     assert client.post(f"{ADM}/accounts/{pid}/password-reset", headers=sa).status_code == 409

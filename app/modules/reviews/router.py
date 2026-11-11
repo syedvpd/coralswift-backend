@@ -26,6 +26,7 @@ from app.modules.applications.models import (
 from app.modules.applications.transitions import Actor
 from app.modules.auth import service as auth_service
 from app.modules.auth.dependencies import ReviewerDep, SuperAdminDep
+from app.modules.documents.audit import audit_denied_download
 from app.modules.enquiries.constants import ActorType
 from app.modules.enquiries.models import Activity, Enquiry
 from app.modules.messaging import service as msg_service
@@ -619,16 +620,19 @@ def download_document(
     db: DbSession,
     version: Annotated[int | None, Query(ge=1)] = None,
 ) -> Response:
-    app = service.get_reviewable(db, staff, application_id)
-    doc = service.get_application_document(db, app, document_id)
-    data, ver = doc_service.read_version(
-        db,
-        request.app.state.storage,
-        doc,
-        version,
-        actor_type=ActorType.REVIEWER,
-        actor_user_id=staff.user.id,
-    )
+    with audit_denied_download(
+        db, document_id, actor_type=ActorType.REVIEWER, actor_user_id=staff.user.id
+    ):
+        app = service.get_reviewable(db, staff, application_id)
+        doc = service.get_application_document(db, app, document_id)
+        data, ver = doc_service.read_version(
+            db,
+            request.app.state.storage,
+            doc,
+            version,
+            actor_type=ActorType.REVIEWER,
+            actor_user_id=staff.user.id,
+        )
     return Response(
         content=data,
         media_type=ver.content_type,

@@ -18,6 +18,7 @@ from app.modules.admin import settings_service as cfg
 from app.modules.auth import mfa
 from app.modules.auth.constants import StaffRole, TokenPurpose, UserStatus, UserType
 from app.modules.auth.models import AuthSession, AuthToken, MfaRecoveryCode, User
+from app.modules.auth.policy import effective_settings
 from app.modules.auth.security import (
     burn_verify,
     hash_password,
@@ -173,6 +174,7 @@ def login(
     ip: str | None,
     user_agent: str | None,
 ) -> tuple[TokenPair, User]:
+    settings = effective_settings(db, settings)
     email = email.strip().lower()
     now = utcnow()
     user = db.execute(
@@ -191,9 +193,13 @@ def login(
         if (
             user is not None
             and user.password_hash is not None
-            and user.status is UserStatus.DEACTIVATED
+            and user.status in (UserStatus.DEACTIVATED, UserStatus.SUSPENDED)
             and verify_password(settings, user.password_hash, password)
         ):
+            if user.status is UserStatus.SUSPENDED:
+                raise AppError(
+                    "This account has been suspended", status_code=403, code="ACCOUNT_SUSPENDED"
+                )
             raise AppError(
                 "This account has been deactivated", status_code=403, code="ACCOUNT_DEACTIVATED"
             )
@@ -234,6 +240,7 @@ def login(
 
 
 def refresh_session(db: Session, settings: Settings, refresh_token: str) -> TokenPair:
+    settings = effective_settings(db, settings)
     h = hash_token(refresh_token)
     now = utcnow()
     session = db.execute(
@@ -366,6 +373,7 @@ def invite_partner_user(
     role: MembershipRole = MembershipRole.OWNER,
 ) -> None:
     """Create or re-issue a pending partner account for an organization. Caller commits."""
+    settings = effective_settings(db, settings)
     email = email.strip().lower()
     user = db.execute(
         select(User).where(User.email == email).with_for_update()
@@ -422,6 +430,7 @@ def invite_partner_user(
 
 def accept_invitation(db: Session, settings: Settings, token: str, password: str) -> User:
     # Check the policy first so a weak password does not burn the one-time token.
+    settings = effective_settings(db, settings)
     row = db.execute(
         select(AuthToken).where(
             AuthToken.token_hash == hash_token(token), AuthToken.purpose == TokenPurpose.INVITATION
@@ -435,7 +444,7 @@ def accept_invitation(db: Session, settings: Settings, token: str, password: str
     validate_password_policy(settings, password, user.email)
     user_id = _consume_token(db, token, TokenPurpose.INVITATION)
     user = db.execute(select(User).where(User.id == user_id).with_for_update()).scalar_one()
-    if user.status is UserStatus.DEACTIVATED:
+    if user.status in (UserStatus.DEACTIVATED, UserStatus.SUSPENDED):
         raise _invalid_token()
     user.password_hash = hash_password(settings, password)
     user.status = UserStatus.ACTIVE
@@ -448,6 +457,7 @@ def accept_invitation(db: Session, settings: Settings, token: str, password: str
 # ------------------------------------------------------------- password reset
 def request_password_reset(db: Session, settings: Settings, email: str) -> None:
     """Never reveals whether the address has an account (caller always answers 202)."""
+    settings = effective_settings(db, settings)
     user = db.execute(
         select(User).where(User.email == email.strip().lower()).with_for_update()
     ).scalar_one_or_none()
@@ -472,6 +482,7 @@ def request_password_reset(db: Session, settings: Settings, email: str) -> None:
 
 
 def confirm_password_reset(db: Session, settings: Settings, token: str, new_password: str) -> None:
+    settings = effective_settings(db, settings)
     row = db.execute(
         select(AuthToken).where(
             AuthToken.token_hash == hash_token(token),
@@ -501,6 +512,7 @@ def create_staff_user(
     db: Session, settings: Settings, *, email: str, full_name: str, role: StaffRole, password: str
 ) -> User:
     """Used by scripts/create_staff_user.py only; there is no public path to create staff."""
+    settings = effective_settings(db, settings)
     validate_password_policy(settings, password, email)
     user = User(
         email=email.strip().lower(),
@@ -625,6 +637,7 @@ def invite_staff_user(
 ) -> User:
     """Super administrator creates a pending staff account; the invitee sets a password, then must
     enroll MFA at first login. Caller commits."""
+    settings = effective_settings(db, settings)
     email = email.strip().lower()
     if db.execute(select(User).where(User.email == email)).scalar_one_or_none() is not None:
         raise AppError(
@@ -695,6 +708,7 @@ def change_password(
     new_password: str,
 ) -> None:
     """Authenticated password change. Other sessions of the account are revoked; this one stays."""
+    settings = effective_settings(db, settings)
     if user.password_hash is None or not verify_password(
         settings, user.password_hash, current_password
     ):
@@ -746,6 +760,7 @@ def invitation_state(db: Session, user: User) -> str:
 
 def resend_invitation(db: Session, settings: Settings, actor: User, user: User) -> None:
     """Issue a fresh invitation link for an account that has not been activated. Caller commits."""
+    settings = effective_settings(db, settings)
     if user.status is not UserStatus.INVITED:
         raise AppError(
             "Only accounts that have not been activated can be re-invited",

@@ -19663,7 +19663,8 @@
     "enum": [
      "invited",
      "active",
-     "deactivated"
+     "deactivated",
+     "suspended"
     ],
     "title": "UserStatus",
     "type": "string"

@@ -38,7 +38,12 @@ def test_preview_counts_without_changing_anything(
 ) -> None:
     for _ in range(2):
         client.post("/api/v1/enquiries/contact", json=factories.contact())
-    db.execute(update(Enquiry).values(response_due_at=utcnow() - timedelta(hours=1)))
+    db.execute(
+        update(Enquiry).values(
+            response_due_at=utcnow() - timedelta(hours=1),
+            created_at=utcnow() - timedelta(hours=49),  # past the 48 h escalation target
+        )
+    )
     db.commit()
     before = _counts(db)
 

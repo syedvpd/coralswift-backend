@@ -39,7 +39,8 @@ from app.modules.auth import service as auth_service
 from app.modules.auth.constants import StaffRole, UserStatus
 from app.modules.auth.dependencies import StaffContext, SuperAdminDep, require_staff
 from app.modules.auth.models import User
-from app.modules.enquiries.constants import EnquiryStatus, EnquiryType, Priority
+from app.modules.documents.audit import audit_denied_download
+from app.modules.enquiries.constants import ActorType, EnquiryStatus, EnquiryType, Priority
 from app.modules.enquiries.models import Activity, Enquiry
 from app.modules.notifications.service import dispatch_notifications
 from app.modules.projects.constants import ProjectCategory
@@ -247,9 +248,12 @@ def complete_followup(
 def download(
     enquiry_id: uuid.UUID, document_id: uuid.UUID, request: Request, staff: AdminDep, db: DbSession
 ) -> Response:
-    data, doc = service.download_document(
-        db, request.app.state.storage, staff, enquiry_id, document_id
-    )
+    with audit_denied_download(
+        db, document_id, actor_type=ActorType.STAFF, actor_user_id=staff.user.id
+    ):
+        data, doc = service.download_document(
+            db, request.app.state.storage, staff, enquiry_id, document_id
+        )
     return Response(
         content=data,
         media_type=doc.content_type,

@@ -10,7 +10,7 @@ import logging
 from collections.abc import Sequence
 from datetime import timedelta
 
-from sqlalchemy import Row, Select, func, select, text
+from sqlalchemy import Row, Select, and_, func, or_, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.common import idempotency
@@ -27,6 +27,7 @@ from app.modules.documents.constants import attachable_statuses
 from app.modules.enquiries.activity import log_activity
 from app.modules.enquiries.constants import ActorType, EnquiryStatus
 from app.modules.enquiries.models import Enquiry
+from app.modules.enquiries.routing import DEFAULT_ESCALATION_HOURS
 from app.modules.notifications.constants import DeliveryStatus, NotificationType, TemplateKey
 from app.modules.notifications.models import Notification
 from app.modules.notifications.service import dispatch_notifications, queue_notification
@@ -80,9 +81,24 @@ def send_expiry_reminders(db: Session) -> int:
     return queued
 
 
-def _overdue() -> Select[Enquiry]:
+def _overdue(db: Session) -> Select[Enquiry]:
+    """Enquiries still without a first response after their queue's ESCALATION target
+    (default 48 h, setting `sla_escalation.<queue>`; the 24 h first-response target only sets
+    `response_due_at`). Counted from creation."""
+    now = utcnow()
+    per_queue = [
+        and_(
+            Enquiry.enquiry_type == queue,
+            Enquiry.created_at
+            < now
+            - timedelta(
+                hours=cfg.get_int(db, f"sla_escalation.{queue}") or DEFAULT_ESCALATION_HOURS
+            ),
+        )
+        for queue in cfg.QUEUES
+    ]
     return select(Enquiry).where(
-        Enquiry.response_due_at < utcnow(),
+        or_(*per_queue),
         Enquiry.first_response_at.is_(None),
         Enquiry.escalated_at.is_(None),
         Enquiry.status != EnquiryStatus.CLOSED,
@@ -91,7 +107,7 @@ def _overdue() -> Select[Enquiry]:
 
 def escalate_overdue(db: Session, settings: Settings) -> int:
     """Tell the escalation contact once when a first-response target is missed (PRD s.28)."""
-    rows = db.execute(_overdue().with_for_update(skip_locked=True)).scalars().all()
+    rows = db.execute(_overdue(db).with_for_update(skip_locked=True)).scalars().all()
     for e in rows:
         queue = e.enquiry_type.value
         fallback = {
@@ -227,7 +243,7 @@ def preview(factory: sessionmaker[Session], settings: Settings) -> dict[str, int
                 )
                 or 0
             ),
-            "sla_would_escalate": len(db.execute(_overdue()).scalars().all()),
+            "sla_would_escalate": len(db.execute(_overdue(db)).scalars().all()),
             "expiry_reminders_would_queue": reminders,
             "documents_would_purge": len(db.execute(_purgeable()).scalars().all()),
             "content_would_publish": scheduled_content_due(db),
