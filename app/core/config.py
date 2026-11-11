@@ -63,6 +63,8 @@ class Settings(BaseSettings):
 
     email_backend: Literal["console", "brevo"] = "console"
     brevo_api_key: SecretStr | None = None
+    enquiry_reply_enabled: bool = False  # D15: ad-hoc requester emails stay off until approved
+    email_webhook_secret: SecretStr | None = None  # shared secret for provider event webhooks
     email_sender_address: str | None = None
     email_sender_name: str = "Coral Swift"
     notification_max_retries: int = Field(default=5, gt=0)

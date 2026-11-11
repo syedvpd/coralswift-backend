@@ -5,7 +5,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.common.validation import Long, Name
-from app.modules.auth.constants import StaffRole
+from app.modules.auth.constants import StaffRole, UserStatus
+from app.modules.documents.scan import ScanStatusMixin
 from app.modules.enquiries.constants import EnquiryStatus, EnquiryType, Priority
 
 
@@ -154,7 +155,7 @@ class EnquiryDetailsOut(BaseModel):
     access_classification: str | None = None
 
 
-class EnquiryDocumentOut(BaseModel):
+class EnquiryDocumentOut(ScanStatusMixin):
     id: uuid.UUID
     original_filename: str
     content_type: str
@@ -234,6 +235,10 @@ class KpisOut(BaseModel):
     portal_adoption: KpiPortalAdoptionOut | None = None
     eligibility_outcomes_recorded: dict[str, int] | None = None
     document_review_turnaround_hours_avg: float | None = None
+    applications_decided: int | None = None
+    application_decision_turnaround_hours_avg: float | None = None
+    onboarding_completed: int | None = None
+    onboarding_duration_days_avg: float | None = None
 
 
 class ReportCountOut(BaseModel):
@@ -280,6 +285,19 @@ class OrganizationProfileOut(BaseModel):
     annual_turnover_inr_crore: float | None = None
     client_references: list[dict[str, Any]] | None = None
     authorized_contacts: list[dict[str, Any]] | None = None
+    additional_contacts: list[dict[str, Any]] | None = None
+    trading_name: str | None = None
+    company_type: str | None = None
+    state: str | None = None
+    city: str | None = None
+    primary_industry: str | None = None
+    competencies: list[str] | None = None
+    operating_model: str | None = None
+    coverage: list[str] | None = None
+    years_of_experience: int | None = None
+    offices: list[dict[str, Any]] | None = None
+    workforce: dict[str, Any] | None = None
+    financial_period: str | None = None
 
 
 class OrganizationApplicationOut(BaseModel):
@@ -326,12 +344,25 @@ class StaffRoleIn(BaseModel):
     role: StaffRole
 
 
+class StaffProfileIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    full_name: Name
+
+
+class StaffActivityRow(BaseModel):
+    action: str
+    record_type: str
+    actor_name: str | None
+    created_at: datetime
+
+
 class StaffOut(BaseModel):
     id: uuid.UUID
     email: str
     full_name: str
     staff_role: StaffRole | None
-    status: str
+    status: UserStatus
     mfa_enabled: bool
     last_login_at: datetime | None
     created_at: datetime | None = None
@@ -347,6 +378,9 @@ class AuditRow(BaseModel):
     actor_user_id: uuid.UUID | None
     organization_id: uuid.UUID | None
     request_id: str | None
+    ip_address: str | None = None
+    user_agent: str | None = None
+    outcome: str = "success"
     meta: dict[str, Any]
     created_at: datetime
     actor_name: str | None = None  # full name of actor_user_id

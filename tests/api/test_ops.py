@@ -232,7 +232,7 @@ def test_profile_change_request_flow_and_partner_extras(
     assert client.get(url, headers=p.headers).json()["data"][0]["status"] == "approved"
     notes = client.get("/api/v1/partner/notifications", headers=p.headers).json()["data"]
     assert any(n["template"] == "profile_change_decision" for n in notes) and all(
-        "link" not in n for n in notes
+        "token" not in str(n.get("link") or "") for n in notes
     )
     client.post("/api/v1/enquiries/contact", json=factories.contact(business_email=p.email))
     mine = client.get("/api/v1/partner/enquiries", headers=p.headers).json()["data"]

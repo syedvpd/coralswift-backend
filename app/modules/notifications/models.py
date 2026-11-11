@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, SmallInteger, String
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, SmallInteger, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -40,3 +40,17 @@ class Notification(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("retry_count >= 0", name="retry_non_negative"),
         Index("ix_notifications_status_created", "delivery_status", "created_at"),
     )
+
+
+class PartnerNotificationPreference(Base):
+    """Per-user opt-out for optional email categories. Mandatory categories are never stored
+    as disabled (see notifications.preferences)."""
+
+    __tablename__ = "partner_notification_preferences"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True
+    )
+    category: Mapped[str] = mapped_column(String(40), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

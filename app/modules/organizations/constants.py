@@ -33,3 +33,27 @@ REQUIRED_PROFILE_FIELDS = (
     "authorized_contacts",
 )
 MIN_CLIENT_REFERENCES = 2
+
+
+class CompanyType(enum.StrEnum):
+    PRIVATE_LIMITED = "private_limited"
+    PUBLIC_LIMITED = "public_limited"
+    PARTNERSHIP = "partnership"
+    LLP = "llp"
+    PROPRIETORSHIP = "proprietorship"
+    NONPROFIT = "nonprofit"
+    OTHER = "other"
+
+
+class OperatingModel(enum.StrEnum):
+    ONSITE = "onsite"
+    REMOTE = "remote"
+    HYBRID = "hybrid"
+    MULTI_LOCATION = "multi_location"
+
+
+# Partner permissions the API enforces. Richer roles are an open decision (D22).
+PARTNER_PERMISSIONS: dict[MembershipRole, list[str]] = {
+    MembershipRole.OWNER: ["team.manage"],
+    MembershipRole.MEMBER: [],
+}

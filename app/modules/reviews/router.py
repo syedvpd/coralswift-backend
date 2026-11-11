@@ -18,7 +18,7 @@ from app.database.dependencies import DbSession
 from app.modules.admin import lookups
 from app.modules.applications import service as app_service
 from app.modules.applications import transitions
-from app.modules.applications.constants import PortalStatus
+from app.modules.applications.constants import TERMINAL, PortalStatus
 from app.modules.applications.models import (
     ApplicationStatusHistory,
     PortalApplication,
@@ -296,6 +296,53 @@ def reviewer_transitions(staff: ReviewerDep) -> ApiResponse[list[TransitionRule]
     return ok([TransitionRule.model_validate(r) for r in rules])
 
 
+class ReviewerWorkloadRow(BaseModel):
+    reviewer_id: uuid.UUID | None
+    reviewer_name: str | None
+    open_applications: int
+    by_status: dict[str, int]
+
+
+class ReviewerWorkloadOut(BaseModel):
+    rows: list[ReviewerWorkloadRow]
+    total_open: int
+
+
+@router.get(
+    "/workload",
+    response_model=ApiResponse[ReviewerWorkloadOut],
+    responses=_ERR,
+    summary="Open applications per reviewer (counts only; reviewers see their own row)",
+)
+def reviewer_workload(staff: ReviewerDep, db: DbSession) -> ApiResponse[ReviewerWorkloadOut]:
+    open_stmt = (
+        select(
+            PortalApplication.assigned_reviewer_id,
+            PortalApplication.status,
+            func.count().label("n"),
+        )
+        .where(PortalApplication.status.notin_([PortalStatus.DRAFT, *TERMINAL]))
+        .group_by(PortalApplication.assigned_reviewer_id, PortalApplication.status)
+    )
+    if not staff.is_super_admin:
+        open_stmt = open_stmt.where(PortalApplication.assigned_reviewer_id == staff.user.id)
+    grouped: dict[uuid.UUID | None, dict[str, int]] = {}
+    for reviewer_id, status, n in db.execute(open_stmt).all():
+        grouped.setdefault(reviewer_id, {})[status.value] = n
+    names = lookups.user_names(db, (r for r in grouped if r))
+    rows = [
+        ReviewerWorkloadRow(
+            reviewer_id=rid,
+            reviewer_name=names.get(rid) if rid else None,
+            open_applications=sum(by.values()),
+            by_status=by,
+        )
+        for rid, by in grouped.items()
+    ]
+    rows.sort(key=lambda r: (r.reviewer_id is None, r.reviewer_name or ""))
+    return ok(ReviewerWorkloadOut(rows=rows, total_open=sum(r.open_applications for r in rows)))
+
+
 class ReviewDetailOut(BaseModel):
     application: ReviewerApplicationOut
     organization: OrganizationOut
@@ -430,7 +477,7 @@ def request_information(
 ) -> ApiResponse[ReviewerMessageOut]:
     app = service.get_reviewable(db, staff, application_id, lock=True)
     message = msg_service.create_information_request(
-        db, settings, staff, app, payload.body, payload.requested_categories
+        db, settings, staff, app, payload.body, payload.requested_categories, payload.due_date
     )
     db.commit()
     _dispatch(request, settings, background)
@@ -447,6 +494,7 @@ def _message_out(m) -> ReviewerMessageOut:  # type: ignore[no-untyped-def]
         requested_categories=m.requested_categories,
         in_reply_to=m.in_reply_to_id,
         created_at=m.created_at,
+        due_date=m.due_date,
     )
 
 

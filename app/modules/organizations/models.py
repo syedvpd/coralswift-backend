@@ -50,12 +50,27 @@ class PartnerOrganization(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     client_references: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     authorized_contacts: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
     profile_version: Mapped[int] = mapped_column(Integer, default=0)
+    # Extended profile (0021); all optional and partner-editable (direct updates, revisions kept)
+    trading_name: Mapped[str | None] = mapped_column(String(200))
+    company_type: Mapped[str | None] = mapped_column(String(60))
+    state: Mapped[str | None] = mapped_column(String(100))
+    city: Mapped[str | None] = mapped_column(String(100))
+    primary_industry: Mapped[str | None] = mapped_column(String(100))
+    competencies: Mapped[list[str] | None] = mapped_column(ARRAY(String(100)))
+    operating_model: Mapped[str | None] = mapped_column(String(100))
+    coverage: Mapped[list[str] | None] = mapped_column(ARRAY(String(100)))
+    years_of_experience: Mapped[int | None] = mapped_column(SmallInteger)
+    offices: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
+    workforce: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    financial_period: Mapped[str | None] = mapped_column(String(30))
+    additional_contacts: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB)
 
     __table_args__ = (
         CheckConstraint("year_established BETWEEN 1800 AND 2100", name="year_range"),
         CheckConstraint("employee_count >= 0", name="employees_non_negative"),
         CheckConstraint("annual_turnover_inr_crore >= 0", name="turnover_non_negative"),
         CheckConstraint("country ~ '^[A-Z]{2}$'", name="country_iso2"),
+        CheckConstraint("years_of_experience BETWEEN 0 AND 200", name="experience_range"),
     )
 
 

@@ -7,7 +7,8 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import case, func, literal_column, select, update
+from sqlalchemy import case, exists, func, literal_column, select, update
+from sqlalchemy.orm import Session
 
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
@@ -17,7 +18,11 @@ from app.core.exceptions import AppError, NotFoundError
 from app.database.dependencies import DbSession
 from app.modules.admin import lookups, service
 from app.modules.admin import settings_service as cfg
-from app.modules.admin.models import EnquiryFollowUp, NotificationTemplate
+from app.modules.admin.models import (
+    EnquiryFollowUp,
+    NotificationTemplate,
+    NotificationTemplateVersion,
+)
 from app.modules.admin.schemas import (
     CommunicationReportOut,
     DocumentReviewReportOut,
@@ -45,7 +50,10 @@ from app.modules.notifications.templates import (
     render_override,
     validate_template,
 )
+from app.modules.onboarding.models import OnboardingRecord
 from app.modules.partner_documents.models import PartnerDocumentVersion
+from app.modules.projects.constants import ProjectCategory
+from app.modules.projects.models import ProjectEnquiry
 
 
 class QueueGate(BaseModel):
@@ -265,12 +273,137 @@ def put_template(
             payload.html_body,
         )
         row.version, row.updated_by, row.updated_at = row.version + 1, staff.user.id, utcnow()
+    _record_version(db, staff, row)
     log_activity(
         db,
         "template",
         uuid.uuid5(uuid.NAMESPACE_URL, k.value),
         "admin.template_changed",
         {"key": k.value, "version": row.version},
+        ActorType.STAFF,
+        actor_user_id=staff.user.id,
+    )
+    db.commit()
+    return ok(
+        TemplateOut(
+            key=k.value,
+            customised=True,
+            version=row.version,
+            subject=row.subject,
+            text_body=row.text_body,
+            html_body=row.html_body,
+        )
+    )
+
+
+def _record_version(
+    db: Session, staff: StaffContext, row: NotificationTemplate, note: str | None = None
+) -> None:
+    db.add(
+        NotificationTemplateVersion(
+            key=row.key,
+            version_no=row.version,
+            subject=row.subject,
+            text_body=row.text_body,
+            html_body=row.html_body,
+            note=note,
+            created_by=staff.user.id,
+            created_at=utcnow(),
+        )
+    )
+
+
+class TemplateVersionOut(BaseModel):
+    version_no: int
+    subject: str
+    text_body: str
+    html_body: str | None
+    note: str | None
+    created_by_name: str | None
+    created_at: datetime
+
+
+@router.get(
+    "/notification-templates/{key}/versions",
+    response_model=ApiResponse[list[TemplateVersionOut]],
+    responses=_ERR,
+    summary="Saved versions of a template override, newest first",
+)
+def template_versions(
+    key: str, staff: SuperAdminDep, db: DbSession, page: PageDep
+) -> ApiResponse[list[TemplateVersionOut]]:
+    k = _tkey(key)
+    base = select(NotificationTemplateVersion).where(NotificationTemplateVersion.key == k.value)
+    total = db.execute(select(func.count()).select_from(base.subquery())).scalar_one()
+    rows = list(
+        db.execute(
+            base.order_by(NotificationTemplateVersion.version_no.desc())
+            .limit(page.page_size)
+            .offset(page.offset)
+        ).scalars()
+    )
+    names = lookups.user_names(db, (r.created_by for r in rows))
+    return ok(
+        [
+            TemplateVersionOut(
+                version_no=r.version_no,
+                subject=r.subject,
+                text_body=r.text_body,
+                html_body=r.html_body,
+                note=r.note,
+                created_by_name=names.get(r.created_by),
+                created_at=r.created_at,
+            )
+            for r in rows
+        ],
+        meta=page_meta(page, total),
+    )
+
+
+@router.post(
+    "/notification-templates/{key}/versions/{version_no}/activate",
+    response_model=ApiResponse[TemplateOut],
+    responses=_ERR,
+    summary="Make an earlier version active again (saved as a new version)",
+)
+def activate_template_version(
+    key: str, version_no: int, staff: SuperAdminDep, db: DbSession
+) -> ApiResponse[TemplateOut]:
+    k = _tkey(key)
+    old = db.execute(
+        select(NotificationTemplateVersion).where(
+            NotificationTemplateVersion.key == k.value,
+            NotificationTemplateVersion.version_no == version_no,
+        )
+    ).scalar_one_or_none()
+    if old is None:
+        raise NotFoundError("Template version not found")
+    row = db.get(NotificationTemplate, k.value)
+    if row is None:  # the override was reverted; recreate it from history
+        row = NotificationTemplate(
+            key=k.value,
+            subject=old.subject,
+            text_body=old.text_body,
+            html_body=old.html_body,
+            version=0,
+            updated_by=staff.user.id,
+            updated_at=utcnow(),
+        )
+        db.add(row)
+    row.subject, row.text_body, row.html_body = old.subject, old.text_body, old.html_body
+    latest = db.execute(
+        select(func.max(NotificationTemplateVersion.version_no)).where(
+            NotificationTemplateVersion.key == k.value
+        )
+    ).scalar_one()
+    row.version, row.updated_by, row.updated_at = (latest or 0) + 1, staff.user.id, utcnow()
+    _record_version(db, staff, row, note=f"Reactivated version {version_no}")
+    log_activity(
+        db,
+        "template",
+        uuid.uuid5(uuid.NAMESPACE_URL, k.value),
+        "admin.template_version_activated",
+        {"key": k.value, "from_version": version_no, "version": row.version},
         ActorType.STAFF,
         actor_user_id=staff.user.id,
     )
@@ -381,6 +514,12 @@ def kpis(
     db: DbSession,
     created_from: Annotated[datetime | None, Query()] = None,
     created_to: Annotated[datetime | None, Query()] = None,
+    assignee_id: Annotated[
+        uuid.UUID | None, Query(description="enquiries assigned to this staff member")
+    ] = None,
+    category: Annotated[
+        ProjectCategory | None, Query(description="project category of project enquiries")
+    ] = None,
 ) -> ApiResponse[KpisOut]:
     types = service.visible_types(staff)
     base = select(Enquiry).where(Enquiry.enquiry_type.in_(types))
@@ -388,6 +527,14 @@ def kpis(
         base = base.where(Enquiry.created_at >= created_from)
     if created_to:
         base = base.where(Enquiry.created_at < created_to)
+    if assignee_id:
+        base = base.where(Enquiry.assigned_user_id == assignee_id)
+    if category:
+        base = base.where(
+            exists().where(
+                ProjectEnquiry.enquiry_id == Enquiry.id, ProjectEnquiry.project_category == category
+            )
+        )
     sub = base.subquery()
     by_source = db.execute(
         select(sub.c.enquiry_type, sub.c.source, func.count()).group_by(
@@ -463,6 +610,34 @@ def kpis(
                 .where(User.user_type == UserType.PARTNER, User.status == UserStatus.ACTIVE)
             ).scalar_one()
         }
+        decided = select(PortalApplication).where(
+            PortalApplication.submitted_at.is_not(None), PortalApplication.decided_at.is_not(None)
+        )
+        if created_from:
+            decided = decided.where(PortalApplication.submitted_at >= created_from)
+        if created_to:
+            decided = decided.where(PortalApplication.submitted_at < created_to)
+        dsub = decided.subquery()
+        turnaround = db.execute(
+            select(
+                func.count(),
+                func.avg(func.extract("epoch", dsub.c.decided_at - dsub.c.submitted_at) / 3600),
+            ).select_from(dsub)
+        ).one()
+        out["applications_decided"] = turnaround[0]
+        out["application_decision_turnaround_hours_avg"] = (
+            round(float(turnaround[1]), 2) if turnaround[1] is not None else None
+        )
+        span = OnboardingRecord.completed_at - OnboardingRecord.started_at
+        onboarded = db.execute(
+            select(func.count(), func.avg(func.extract("epoch", span) / 86400)).where(
+                OnboardingRecord.completed_at.is_not(None)
+            )
+        ).one()
+        out["onboarding_completed"] = onboarded[0]
+        out["onboarding_duration_days_avg"] = (
+            round(float(onboarded[1]), 2) if onboarded[1] is not None else None
+        )
         # Humans decide eligibility; this only counts what reviewers recorded.
         out["eligibility_outcomes_recorded"] = {
             o.value: n

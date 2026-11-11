@@ -99,3 +99,10 @@ Machine-readable contract: [`docs/api/openapi.json`](api/openapi.json) (regenera
 - Account rows include the latest invitation `invitation_delivery_status` and `invitation_delivery_at` (nullable when there is no recorded invitation delivery).
 - Enquiry attachment listing: `GET /api/v1/admin/enquiries/{enquiry_id}/documents`, paginated with standard `meta`; financial attachments are super-administrator only. Downloads are separate, audited, private routes.
 - Test-account provisioning is not performed by this backend contract. Use dedicated development-only accounts and share access details through an approved secure channel; never commit passwords or tokens.
+
+## Additions 2026-11-11 (requirements batch) - see `docs/frontend-backend-requirements-tracker.md`
+- `GET /admin/users/{id}`, `PATCH /admin/users/{id}` `{full_name}`, `GET /admin/users/{id}/activity` (super administrator).
+- `GET /reviewer/workload` (reviewer, super administrator): open applications per reviewer and status; reviewers see only their own row.
+- `POST /auth/login` while locked: 423 `ACCOUNT_LOCKED` only with the correct password; otherwise generic 401. Not-activated stays generic (D37).
+- Document payloads (partner version, admin queue, enquiry attachment, public upload) carry `scan_status`, always `not_scanned` today (no scanner; D33).
+- Role matrix generated from guards: `docs/api/role-permission-matrix.md`. Facts to correct on the frontend: activation link is `/activate?token=` (D38), password minimum is 12, access token 30 min, refresh 7 days.

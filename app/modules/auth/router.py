@@ -34,6 +34,7 @@ from app.modules.auth.schemas import (
     TokenOut,
 )
 from app.modules.notifications.service import dispatch_notifications
+from app.modules.organizations.constants import PARTNER_PERMISSIONS
 from app.modules.organizations.models import PartnerOrganization
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -211,6 +212,7 @@ def my_permissions(auth: AuthDep, request: Request) -> ApiResponse[PermissionsOu
 def _me_out(db: DbSession, settings: Settings, user: User) -> MeOut:
     org_ref = None
     partner_role = None
+    membership = None
     if user.user_type is UserType.PARTNER:
         membership = service.active_membership(db, user.id)
         org = db.get(PartnerOrganization, membership.organization_id) if membership else None
@@ -225,6 +227,7 @@ def _me_out(db: DbSession, settings: Settings, user: User) -> MeOut:
         account_status=user.status,
         staff_role=user.staff_role,
         partner_role=partner_role,
+        permissions=list(PARTNER_PERMISSIONS[membership.role]) if membership else [],
         organization=org_ref,
         mfa_enabled=user.mfa_enabled_at is not None,
         mfa_required=user.user_type is UserType.STAFF and settings.staff_mfa_required,

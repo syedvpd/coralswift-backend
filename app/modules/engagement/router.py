@@ -3,6 +3,7 @@
 import csv
 import io
 import uuid
+from datetime import timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
@@ -11,10 +12,12 @@ from sqlalchemy import func, select
 
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
+from app.common.utilities import utcnow
 from app.core.config import Settings, get_settings
 from app.core.protection import SubmissionGuards, rate_limit, require_human
 from app.database.dependencies import DbSession
 from app.modules.admin import service as admin_service
+from app.modules.admin import settings_service as cfg
 from app.modules.auth.constants import StaffRole
 from app.modules.auth.dependencies import PartnerDep, StaffContext, SuperAdminDep, require_staff
 from app.modules.engagement import service
@@ -36,6 +39,7 @@ from app.modules.engagement.schemas import (
     ReasonIn,
     UnsubscribeIn,
 )
+from app.modules.engagement.service import DEFAULT_PRIVACY_COMPLETION_DAYS
 from app.modules.enquiries.activity import log_activity
 from app.modules.enquiries.constants import ActorType
 from app.modules.enquiries.schemas import SubmissionOut
@@ -283,6 +287,16 @@ def cancel(
     return out
 
 
+def _privacy_admin_out(db: DbSession, r: PrivacyRequest) -> PrivacyRequestOut:
+    out = PrivacyRequestOut.model_validate(r, from_attributes=True)
+    days = cfg.get_int(db, "privacy.completion_days") or DEFAULT_PRIVACY_COMPLETION_DAYS
+    if days:
+        out.completion_due_at = r.created_at + timedelta(days=days)
+        closed = r.status in (PrivacyRequestStatus.COMPLETED, PrivacyRequestStatus.REJECTED)
+        out.is_overdue = not closed and out.completion_due_at < utcnow()
+    return out
+
+
 @admin.get(
     "/privacy-requests",
     response_model=ApiResponse[list[PrivacyRequestOut]],
@@ -296,10 +310,7 @@ def list_privacy(
     status: Annotated[PrivacyRequestStatus | None, Query()] = None,
 ) -> ApiResponse[list[PrivacyRequestOut]]:
     rows, total = service.list_privacy_requests(db, page.page_size, page.offset, status)
-    return ok(
-        [PrivacyRequestOut.model_validate(r, from_attributes=True) for r in rows],
-        meta=page_meta(page, total),
-    )
+    return ok([_privacy_admin_out(db, r) for r in rows], meta=page_meta(page, total))
 
 
 @admin.post(
@@ -311,7 +322,7 @@ def update_privacy(
     row = service.update_privacy_request(
         db, staff, request_id, payload.status, payload.resolution_note
     )
-    return ok(PrivacyRequestOut.model_validate(row, from_attributes=True))
+    return ok(_privacy_admin_out(db, row))
 
 
 @admin.get(

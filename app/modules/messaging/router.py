@@ -1,11 +1,12 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from pydantic import BaseModel, ConfigDict
 
 from app.common.responses import ApiResponse, ErrorResponse, ok
+from app.common.utilities import utcnow
 from app.common.validation import Long
 from app.core.config import Settings, get_settings
 from app.core.protection import rate_limit
@@ -43,6 +44,8 @@ class PartnerMessageOut(BaseModel):
     requested_categories: list[str] | None
     in_reply_to: uuid.UUID | None
     created_at: datetime
+    due_date: date | None = None
+    is_overdue: bool = False
 
 
 def partner_message(m: ApplicationMessage) -> PartnerMessageOut:
@@ -55,6 +58,13 @@ def partner_message(m: ApplicationMessage) -> PartnerMessageOut:
         requested_categories=m.requested_categories,
         in_reply_to=m.in_reply_to_id,
         created_at=m.created_at,
+        due_date=m.due_date,
+        is_overdue=bool(
+            m.due_date
+            and m.status is not None
+            and m.status.value == "open"
+            and m.due_date < utcnow().date()
+        ),
     )
 
 

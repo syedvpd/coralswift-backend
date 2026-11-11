@@ -130,7 +130,12 @@ def test_lockout_after_repeated_failures_even_with_correct_password(
             == 401
         )
     locked = client.post(f"{A}/login", json={"email": p.email, "password": PASSWORD})
-    assert locked.status_code == 401 and locked.json()["error"]["code"] == "INVALID_CREDENTIALS"
+    assert locked.status_code == 423 and locked.json()["error"]["code"] == "ACCOUNT_LOCKED"
+    still_generic = client.post(
+        f"{A}/login", json={"email": p.email, "password": "bad-password-xyz"}
+    )
+    assert still_generic.status_code == 401
+    assert still_generic.json()["error"]["code"] == "INVALID_CREDENTIALS"
     db.execute(
         update(User)
         .where(User.email == p.email)

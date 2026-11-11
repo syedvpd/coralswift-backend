@@ -31,6 +31,10 @@ UNPAGINATED = {
     "/api/v1/admin/audit/actions",  # event catalogue
     "/api/v1/admin/notification-templates/placeholders",  # fixed allow-list
     "/api/v1/partner/organization/editable-fields",  # field metadata
+    "/api/v1/partner/performance/summary",  # one row per published indicator
+    "/api/v1/partner/performance/scorecards",  # one group per published period
+    "/api/v1/partner/onboarding",  # a single record, not a list
+    "/api/v1/admin/onboarding-template",  # one editable task list
 }
 
 
@@ -129,13 +133,17 @@ def test_partner_inbox_read_state_isolation_and_unread_counts(
         "template",
         "title",
         "category",
+        "description",
+        "related_record",
+        "link",
         "related_reference",
         "delivery_status",
         "created_at",
         "read_at",
         "is_read",
     }
-    assert item["is_read"] is False and "link" not in item
+    # links are portal-relative paths only (never tokens or URLs with credentials)
+    assert item["is_read"] is False and (item["link"] is None or item["link"].startswith("/"))
     foreign = client.get("/api/v1/partner/notifications", headers=b.headers).json()["data"][0]["id"]
     assert (
         client.post(f"/api/v1/partner/notifications/{foreign}/read", headers=a.headers).status_code

@@ -65,7 +65,34 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
+def _is_empty(value: Any) -> bool:
+    return value is None or value in ("", [], {})
+
+
 def update_profile(db: Session, ctx: PartnerContext, data: ProfileUpdate) -> PartnerOrganization:
+    """D19: a partner may fill a field that is still empty; changing or clearing a value that is
+    already set goes through a change request that staff approve."""
+    org = get_organization(db, ctx.organization_id)
+    if data.expected_version is not None and data.expected_version != org.profile_version:
+        raise AppError(
+            "The profile was changed by someone else; reload and retry",
+            status_code=409,
+            code="PROFILE_VERSION_CONFLICT",
+        )
+    locked: list[str] = []
+    for field, new in data.model_dump(exclude_unset=True, exclude={"expected_version"}).items():
+        if field == "legal_name" and new is None:
+            continue  # rejected below as not clearable (422)
+        current = _jsonable(getattr(org, field))
+        if not _is_empty(current) and _jsonable(new) != current:
+            locked.append(field)
+    if locked:
+        raise AppError(
+            "These fields already have a value; submit a change request: "
+            + ", ".join(sorted(locked)),
+            status_code=409,
+            code="CHANGE_REQUEST_REQUIRED",
+        )
     return apply_profile_update(db, ctx.organization_id, ctx.user.id, data, ActorType.PARTNER)
 
 

@@ -123,6 +123,10 @@ class Activity(UUIDPrimaryKeyMixin, Base):
         ForeignKey("partner_organizations.id", ondelete="RESTRICT"), index=True
     )
     request_id: Mapped[str | None] = mapped_column(String(64))
+    # Added in 0019: origin of the request and whether the audited action succeeded.
+    ip_address: Mapped[str | None] = mapped_column(String(45))
+    user_agent: Mapped[str | None] = mapped_column(String(200))
+    outcome: Mapped[str] = mapped_column(String(10), default="success", server_default="success")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (Index("ix_activities_record", "record_type", "record_id"),)

@@ -104,6 +104,12 @@ def _portal_lines(key: TemplateKey, ctx: dict[str, str]) -> tuple[str, list[str]
             f"Your {ctx.get('category', '')} document expires on {ctx.get('expires_on', '')}.",
             "Sign in to the partner portal to upload a replacement.",
         ]
+    if key is TemplateKey.STAFF_REPLY:  # staff-authored; the only template that carries free text
+        return ctx.get("subject", "A message from Coral Swift"), [
+            greet,
+            *[line for line in ctx.get("body", "").splitlines() if line.strip()],
+            f"Reference: {ref}" if ref else "",
+        ]
     if key is TemplateKey.PROFILE_CHANGE_DECISION:
         return "Your profile change request was reviewed", [
             greet,

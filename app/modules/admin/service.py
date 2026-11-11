@@ -906,6 +906,18 @@ def org_detail(db: Session, staff: StaffContext, org_id: uuid.UUID) -> dict[str,
         "service_categories": o.service_categories,
         "technical_capabilities": o.technical_capabilities,
         "business_description": o.business_description,
+        "trading_name": o.trading_name,
+        "company_type": o.company_type,
+        "state": o.state,
+        "city": o.city,
+        "primary_industry": o.primary_industry,
+        "competencies": o.competencies,
+        "operating_model": o.operating_model,
+        "coverage": o.coverage,
+        "years_of_experience": o.years_of_experience,
+        "offices": o.offices,
+        "workforce": o.workforce,
+        "financial_period": o.financial_period,
     }
     if _is_super(staff):  # financial / identifying data
         profile.update(
@@ -913,6 +925,7 @@ def org_detail(db: Session, staff: StaffContext, org_id: uuid.UUID) -> dict[str,
             annual_turnover_inr_crore=o.annual_turnover_inr_crore,
             client_references=o.client_references,
             authorized_contacts=o.authorized_contacts,
+            additional_contacts=o.additional_contacts,
         )
     apps = db.execute(
         select(PortalApplication)
@@ -1008,6 +1021,26 @@ def _staff(db: Session, user_id: uuid.UUID) -> User:
     ).scalar_one_or_none()
     if u is None:
         raise NotFoundError("Staff user not found")
+    return u
+
+
+def get_staff(db: Session, user_id: uuid.UUID) -> User:
+    u = db.execute(
+        select(User).where(User.id == user_id, User.user_type == UserType.STAFF)
+    ).scalar_one_or_none()
+    if u is None:
+        raise NotFoundError("Staff user not found")
+    return u
+
+
+def update_staff_profile(
+    db: Session, staff: StaffContext, user_id: uuid.UUID, full_name: str
+) -> User:
+    u = _staff(db, user_id)
+    if u.full_name != full_name:
+        u.full_name = full_name
+        _audit(db, staff, "user", u.id, "admin.staff_profile_updated", {"fields": ["full_name"]})
+    db.commit()
     return u
 
 
@@ -1344,6 +1377,9 @@ def audit_csv(
             "actor_user_id",
             "organization_id",
             "request_id",
+            "ip_address",
+            "user_agent",
+            "outcome",
             "metadata",
             "created_at",
         ]
@@ -1361,6 +1397,9 @@ def audit_csv(
                     row.actor_user_id or "",
                     row.organization_id or "",
                     row.request_id or "",
+                    row.ip_address or "",
+                    row.user_agent or "",
+                    row.outcome,
                     json.dumps(row.meta, sort_keys=True),
                     row.created_at,
                 ]

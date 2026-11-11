@@ -75,6 +75,7 @@ def _store_version(
     upload: UploadFile,
     expires_on: date | None,
     action: str,
+    actor: ActorType = ActorType.PARTNER,
 ) -> PartnerDocumentVersion:
     data = upload.file.read(settings.max_upload_bytes + 1)  # bounded read
     checked = validate_upload(
@@ -134,7 +135,7 @@ def _store_version(
         doc.id,
         action,
         {"category": doc.category.value, "version": version.version_no, "size": version.file_size},
-        ActorType.PARTNER,
+        actor,
         actor_user_id=ctx.user.id,
         organization_id=ctx.organization_id,
     )
@@ -151,13 +152,13 @@ def upload_new(
     upload: UploadFile,
     category: PartnerDocCategory,
     expires_on: date | None,
+    actor: ActorType = ActorType.PARTNER,
+    action: str = "document.uploaded",
 ) -> tuple[PartnerDocument, PartnerDocumentVersion]:
     doc = PartnerDocument(organization_id=ctx.organization_id, category=category)
     db.add(doc)
     db.flush()
-    version = _store_version(
-        db, storage, settings, ctx, doc, upload, expires_on, "document.uploaded"
-    )
+    version = _store_version(db, storage, settings, ctx, doc, upload, expires_on, action, actor)
     return doc, version
 
 
@@ -170,11 +171,11 @@ def replace(
     *,
     upload: UploadFile,
     expires_on: date | None,
+    actor: ActorType = ActorType.PARTNER,
+    action: str = "document.replaced",
 ) -> tuple[PartnerDocument, PartnerDocumentVersion]:
     doc = get_owned(db, ctx.organization_id, document_id, lock=True)
-    version = _store_version(
-        db, storage, settings, ctx, doc, upload, expires_on, "document.replaced"
-    )
+    version = _store_version(db, storage, settings, ctx, doc, upload, expires_on, action, actor)
     return doc, version
 
 
@@ -272,7 +273,9 @@ def missing_required_categories(db: Session, organization_id: uuid.UUID) -> list
             PartnerDocument.organization_id == organization_id,
             PartnerDocument.status == DocStatus.ACTIVE,
             PartnerDocumentVersion.upload_status.in_(ATTACHABLE_STATUSES),
-            PartnerDocumentVersion.review_status != ReviewStatus.REJECTED,
+            PartnerDocumentVersion.review_status.notin_(
+                [ReviewStatus.REJECTED, ReviewStatus.REPLACEMENT_REQUESTED]
+            ),
             # expired evidence no longer counts (expires_on is optional)
             or_(
                 PartnerDocumentVersion.expires_on.is_(None),

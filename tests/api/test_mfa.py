@@ -104,10 +104,8 @@ def test_repeated_wrong_codes_lock_the_account(app_factory: AppFactory, settings
         for _ in range(settings.login_max_failures):
             client.post(f"{A}/mfa/verify", headers=h, json={"code": "000000"})
         assert client.get(f"{A}/me", headers=h).status_code == 401  # sessions revoked
-        assert (
-            client.post(f"{A}/login", json={"email": user.email, "password": PASSWORD}).status_code
-            == 401
-        )
+        locked = client.post(f"{A}/login", json={"email": user.email, "password": PASSWORD})
+        assert locked.status_code == 423 and locked.json()["error"]["code"] == "ACCOUNT_LOCKED"
 
 
 def test_enrollment_rules(app_factory: AppFactory, settings: Settings) -> None:

@@ -1,19 +1,19 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from pydantic import BaseModel
 
 from app.common.responses import ApiResponse, ErrorResponse, ok
 from app.core.config import Settings, get_settings
 from app.core.protection import rate_limit, require_human
 from app.database.dependencies import DbSession
 from app.modules.documents.constants import EvidenceCategory, UploadPurpose
+from app.modules.documents.scan import ScanStatusMixin
 from app.modules.documents.service import upload_document
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
-class DocumentOut(BaseModel):
+class DocumentOut(ScanStatusMixin):
     document_id: str
     original_filename: str
     content_type: str

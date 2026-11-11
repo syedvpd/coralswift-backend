@@ -50,7 +50,8 @@ def test_profile_update_completion_and_history(
     )
     assert r.status_code == 200 and r.json()["data"]["profile_version"] == 1
     assert client.get(f"{ORG}/completion", headers=p.headers).json()["data"]["complete"] is False
-    r = client.put(ORG, headers=p.headers, json=FULL)
+    full = {**FULL, "registration_number": "REG1", "year_established": 2015}
+    r = client.put(ORG, headers=p.headers, json=full)
     data = r.json()["data"]
     assert r.status_code == 200 and data["profile_version"] == 2 and data["country"] == "IN"
     meta = client.get(f"{ORG}/editable-fields", headers=p.headers).json()["data"]
@@ -64,12 +65,16 @@ def test_profile_update_completion_and_history(
     assert [h["version"] for h in hist] == [2, 1]
     assert hist[1]["changes"]["registration_number"] == {"old": None, "new": "REG1"}
     # unchanged resubmission creates no new revision
-    client.put(ORG, headers=p.headers, json=FULL)
+    client.put(ORG, headers=p.headers, json=full)
     assert len(client.get(f"{ORG}/history", headers=p.headers).json()["data"]) == 2
+    # D19: an existing value cannot be changed or cleared directly; it needs a change request
     cleared = client.put(ORG, headers=p.headers, json={"website": None})
-    assert cleared.status_code == 200 and cleared.json()["data"]["website"] is None
-    latest = client.get(f"{ORG}/history", headers=p.headers).json()["data"][0]
-    assert latest["changes"]["website"]["new"] is None
+    assert (
+        cleared.status_code == 409 and cleared.json()["error"]["code"] == "CHANGE_REQUEST_REQUIRED"
+    )
+    changed = client.put(ORG, headers=p.headers, json={"registration_number": "OTHER"})
+    assert changed.status_code == 409
+    assert client.get(ORG, headers=p.headers).json()["data"]["registration_number"] == "REG1"
     assert client.put(ORG, headers=p.headers, json={"legal_name": None}).status_code == 422
 
 
@@ -89,10 +94,10 @@ def test_validation_and_optimistic_concurrency(
         assert client.put(ORG, headers=p.headers, json=bad).status_code == 422, bad
     client.put(ORG, headers=p.headers, json={"registration_number": "R1"})
     stale = client.put(
-        ORG, headers=p.headers, json={"registration_number": "R2", "expected_version": 0}
+        ORG, headers=p.headers, json={"website": "https://a.example", "expected_version": 0}
     )
     assert stale.status_code == 409 and stale.json()["error"]["code"] == "PROFILE_VERSION_CONFLICT"
-    body = {"registration_number": "R2", "expected_version": 1}
+    body = {"website": "https://a.example", "expected_version": 1}
     ok = client.put(ORG, headers=p.headers, json=body)
     assert ok.status_code == 200
 

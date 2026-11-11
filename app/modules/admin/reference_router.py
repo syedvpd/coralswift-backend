@@ -7,22 +7,29 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Query, Request
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, or_, select
 
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
+from app.common.utilities import utcnow
+from app.common.validation import Long
 from app.core.config import Settings, get_settings
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import AppError, NotFoundError
 from app.database.dependencies import DbSession
+from app.integrations.storage import StorageError
 from app.modules.admin import lookups
+from app.modules.admin import settings_service as cfg
 from app.modules.applications.constants import PortalStatus
 from app.modules.applications.models import PortalApplication
 from app.modules.auth.dependencies import ReviewerDep, SuperAdminDep
 from app.modules.auth.security import MAX_PASSWORD_LENGTH
 from app.modules.documents.constants import UploadStatus
 from app.modules.documents.files import KINDS
+from app.modules.documents.scan import ScanStatusMixin
+from app.modules.enquiries.activity import log_activity
+from app.modules.enquiries.constants import ActorType
 from app.modules.organizations.models import PartnerOrganization
 from app.modules.partner_documents.constants import DocStatus, PartnerDocCategory, ReviewStatus
 from app.modules.partner_documents.models import PartnerDocument, PartnerDocumentVersion
@@ -36,7 +43,7 @@ _ERR: dict[int | str, dict[str, Any]] = {
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
-class DocumentQueueRow(BaseModel):
+class DocumentQueueRow(ScanStatusMixin):
     document_id: uuid.UUID
     organization_id: uuid.UUID
     organization_name: str
@@ -54,6 +61,7 @@ class DocumentQueueRow(BaseModel):
     reviewed_by_name: str | None
     reviewed_at: datetime | None
     retention_date: datetime | None
+    retention_until: datetime | None  # same value as retention_date
     purged: bool
 
 
@@ -160,6 +168,7 @@ def document_queue(
                 reviewed_by_name=names.get(v.reviewed_by) if v.reviewed_by else None,
                 reviewed_at=v.reviewed_at,
                 retention_date=v.retention_date,
+                retention_until=v.retention_date,
                 purged=v.purged_at is not None,
             )
             for d, v, org in rows
@@ -278,3 +287,84 @@ def security_policy(staff: SuperAdminDep, settings: SettingsDep) -> ApiResponse[
             captcha_enabled=settings.captcha_enabled,
         )
     )
+
+
+# ------------------------------------------------------------ hard deletion
+class PurgeIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: Long
+
+
+class PurgeOut(BaseModel):
+    document_id: uuid.UUID
+    versions_purged: int
+
+
+@router.post(
+    "/documents/{document_id}/purge",
+    response_model=ApiResponse[PurgeOut],
+    responses={**_ERR, 404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
+    summary="Permanently delete the stored files of a removed document (rows stay for audit)",
+)
+def purge_document(
+    document_id: uuid.UUID,
+    payload: PurgeIn,
+    request: Request,
+    staff: SuperAdminDep,
+    db: DbSession,
+) -> ApiResponse[PurgeOut]:
+    """Irreversible. Only for documents the partner removed whose every version has a retention
+    date in the past; the retention period itself is an owner decision (D4)."""
+    if cfg.get_int(db, "retention.partner_document_days") is None:
+        raise AppError(
+            "Permanent deletion is blocked: the retention policy has not been approved. "
+            "Set retention.partner_document_days only after legal sign-off.",
+            status_code=409,
+            code="RETENTION_POLICY_NOT_APPROVED",
+        )
+    doc = db.execute(
+        select(PartnerDocument).where(PartnerDocument.id == document_id).with_for_update()
+    ).scalar_one_or_none()
+    if doc is None:
+        raise NotFoundError("Document not found")
+    if doc.status is not DocStatus.REMOVED:
+        raise AppError("Only removed documents can be purged", status_code=409, code="NOT_REMOVED")
+    versions = list(
+        db.execute(
+            select(PartnerDocumentVersion)
+            .where(PartnerDocumentVersion.document_id == doc.id)
+            .with_for_update()
+        ).scalars()
+    )
+    now = utcnow()
+    if any(v.retention_date is None or v.retention_date > now for v in versions):
+        raise AppError(
+            "Retention period has not ended for every version",
+            status_code=409,
+            code="RETENTION_ACTIVE",
+        )
+    purged = 0
+    for v in versions:
+        if v.purged_at is not None:
+            continue
+        try:
+            request.app.state.storage.delete(v.storage_key)
+        except StorageError:
+            raise AppError(
+                "File storage is unavailable", status_code=503, code="STORAGE_UNAVAILABLE"
+            ) from None
+        v.purged_at = now
+        purged += 1
+    log_activity(
+        db,
+        "partner_document",
+        doc.id,
+        "document.purged_by_staff",
+        {"versions": purged},
+        ActorType.STAFF,
+        actor_user_id=staff.user.id,
+        organization_id=doc.organization_id,
+    )
+    db.commit()
+    return ok(PurgeOut(document_id=doc.id, versions_purged=purged), "Files deleted")

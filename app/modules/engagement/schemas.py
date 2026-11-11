@@ -120,6 +120,8 @@ class PrivacyRequestOut(BaseModel):
     created_at: datetime
     email_verified: bool = False
     submitted_by_partner: bool = False
+    completion_due_at: datetime | None = None  # set only when privacy.completion_days is configured
+    is_overdue: bool = False
 
 
 class PrivacyVerifyIn(BaseModel):

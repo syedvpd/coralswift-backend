@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.common.utilities import utcnow
 from app.core.config import Settings
 from app.core.exceptions import AppError, NotFoundError
+from app.modules.admin import settings_service as cfg
 from app.modules.auth.dependencies import StaffContext
 from app.modules.auth.security import hash_token, new_token
 from app.modules.engagement.models import (
@@ -196,7 +197,8 @@ def unsubscribe(db: Session, settings: Settings, email: str, token: str) -> None
 
 
 # ---------------------------------------------------------- privacy requests
-PRIVACY_VERIFY_HOURS = 72  # shortcut: fixed window; make it a setting if the owner wants another
+DEFAULT_PRIVACY_COMPLETION_DAYS = 30  # provisional operational target, not legal advice
+PRIVACY_VERIFY_HOURS = 72  # provisional default; setting privacy.verification_hours overrides it
 
 
 def create_privacy_request(
@@ -223,7 +225,9 @@ def create_privacy_request(
     else:
         raw = new_token()
         row.verification_token_hash = hash_token(raw)
-        row.verification_expires_at = utcnow() + timedelta(hours=PRIVACY_VERIFY_HOURS)
+        row.verification_expires_at = utcnow() + timedelta(
+            hours=cfg.get_int(db, "privacy.verification_hours") or PRIVACY_VERIFY_HOURS
+        )
         context["link"] = f"{settings.portal_base_url.rstrip('/')}/privacy/verify?token={raw}"
     db.add(row)
     db.flush()

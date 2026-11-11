@@ -27,7 +27,7 @@ PARTNER_LABELS = {
     PortalStatus.ELIGIBILITY_VERIFICATION: "Eligibility verification",
     PortalStatus.CAPABILITY_REVIEW: "Capability review",
     PortalStatus.COMMERCIAL_LEGAL_REVIEW: "Commercial and legal review",
-    PortalStatus.PILOT_ONBOARDING: "Pilot / onboarding",
+    PortalStatus.PILOT_ONBOARDING: "Approved - pilot",
     PortalStatus.SCALE_UP: "Scale-up",
     PortalStatus.INFORMATION_REQUESTED: "Additional information requested",
     PortalStatus.REJECTED: "Not progressed",

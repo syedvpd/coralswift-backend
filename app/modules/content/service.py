@@ -20,6 +20,7 @@ from app.core.exceptions import AppError, NotFoundError
 from app.integrations.storage import Storage, StorageError
 from app.modules.auth.constants import StaffRole
 from app.modules.auth.dependencies import StaffContext
+from app.modules.content.blocks import check_block_data
 from app.modules.content.constants import (
     PERMISSION_REQUIRED,
     ClaimCategory,
@@ -40,6 +41,7 @@ def _audit(
     action: str,
     meta: dict[str, Any] | None = None,
 ) -> None:
+    item.updated_by = staff.user.id
     log_activity(
         db,
         "content",
@@ -101,6 +103,11 @@ def update(
         raise _bad("Only drafts can be edited; reopen the content first")
     if "claim_ids" in changes:
         changes["claim_ids"] = _check_claim_ids(db, changes["claim_ids"])
+    if "data" in changes:
+        try:
+            check_block_data(item.content_type, changes["data"])
+        except ValueError as exc:
+            raise _bad(str(exc), "INVALID_BLOCK_DATA") from None
     text_changed = any(k in changes for k in ("title", "summary", "body"))
     for k, v in changes.items():
         setattr(item, k, v)

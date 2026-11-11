@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
@@ -16,6 +16,7 @@ from app.database.dependencies import DbSession
 from app.modules.auth.constants import StaffRole
 from app.modules.auth.dependencies import StaffContext, SuperAdminDep, require_staff
 from app.modules.content import service
+from app.modules.content.blocks import check_block_data
 from app.modules.content.constants import ClaimCategory, ClaimStatus, ContentStatus, ContentType
 from app.modules.content.models import ContentItem
 
@@ -66,6 +67,9 @@ class SeoFields(BaseModel):
     image_alt: Annotated[str, Field(max_length=200)] | None = None
 
 
+BodyFormat = Literal["plain", "markdown"]  # raw HTML is not accepted: it would be stored XSS
+
+
 class ContentIn(SeoFields):
     model_config = ConfigDict(extra="forbid")
 
@@ -77,6 +81,15 @@ class ContentIn(SeoFields):
     category: Annotated[str, Field(max_length=80)] | None = None
     tags: Tags = Field(default_factory=list)
     claim_ids: list[uuid.UUID] = Field(default_factory=list, max_length=50)
+    body_format: BodyFormat = "plain"
+    data: dict[str, Any] | None = Field(
+        default=None, description="structured block (hero, navigation)"
+    )
+
+    @model_validator(mode="after")
+    def _data_matches_type(self) -> "ContentIn":
+        check_block_data(self.content_type, self.data)
+        return self
 
 
 class ContentUpdate(SeoFields):
@@ -88,6 +101,8 @@ class ContentUpdate(SeoFields):
     category: Annotated[str, Field(max_length=80)] | None = None
     tags: Tags | None = None
     claim_ids: list[uuid.UUID] | None = Field(default=None, max_length=50)
+    body_format: BodyFormat | None = None
+    data: dict[str, Any] | None = None
 
 
 class NoteIn(BaseModel):
@@ -134,6 +149,8 @@ class PublicContent(SeoFields):
     published_at: datetime | None
     last_reviewed_at: datetime | None
     attachment: AttachmentOut | None
+    body_format: str = "plain"
+    data: dict[str, Any] | None = None
 
 
 class PublicContentDetail(PublicContent):
@@ -151,6 +168,8 @@ class AdminContent(PublicContent):
     current_version: int
     claim_ids: list[str]
     scheduled_publish_at: datetime | None = None
+    updated_at: datetime | None = None
+    updated_by: uuid.UUID | None = None
 
 
 class VersionOut(BaseModel):
@@ -183,6 +202,8 @@ def _pub(i: ContentItem) -> PublicContent:
         published_at=i.published_at,
         last_reviewed_at=i.last_reviewed_at,
         attachment=att,
+        body_format=i.body_format,
+        data=i.data,
         **{k: getattr(i, k) for k in SEO_FIELDS},
     )
 
@@ -199,6 +220,8 @@ def _adm(i: ContentItem) -> AdminContent:
         current_version=i.current_version,
         claim_ids=list(i.claim_ids or []),
         scheduled_publish_at=i.scheduled_publish_at,
+        updated_at=i.updated_at,
+        updated_by=i.updated_by,
     )
 
 

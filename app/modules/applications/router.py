@@ -37,7 +37,12 @@ ACTION_LIMIT = [Depends(rate_limit("application-action"))]
 
 
 def _out(db: DbSession, app: PortalApplication) -> ApplicationOut:
-    return application_out(app, service.open_request_count(db, app.id))
+    return application_out(
+        app,
+        service.open_request_count(db, app.id),
+        service.decision_explanation(db, app),
+        service.next_information_due(db, app.id),
+    )
 
 
 def _dispatch(request: Request, settings: Settings, background: BackgroundTasks) -> None:

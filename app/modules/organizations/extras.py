@@ -95,10 +95,12 @@ def create_request(
     payload: ChangeRequestIn, ctx: PartnerDep, db: DbSession
 ) -> ApiResponse[ChangeRequestOut]:
     changes = payload.changes.model_dump(
-        mode="json", exclude_unset=True, exclude_none=True, exclude={"expected_version"}
-    )
+        mode="json", exclude_unset=True, exclude={"expected_version"}
+    )  # explicit nulls are kept: they request clearing a value
     if not changes:
         raise AppError("No changes supplied", status_code=422, code="NO_CHANGES")
+    if "legal_name" in changes and changes["legal_name"] is None:
+        raise AppError("Legal name cannot be cleared", status_code=422, code="FIELD_NOT_CLEARABLE")
     row = ProfileChangeRequest(
         organization_id=ctx.organization_id,
         requested_by=ctx.user.id,
@@ -149,10 +151,41 @@ TITLES = {
 }
 
 
+DESCRIPTIONS = {
+    "application_submitted": "We received your partner application. This is a receipt only.",
+    "information_requested": "The reviewer needs more information. Open the application.",
+    "application_status_changed": "The stage of your application changed.",
+    "application_decision": "A decision was recorded on your application.",
+    "expiry_reminder": "One of your documents is close to its expiry date.",
+    "profile_change_decision": "Staff reviewed your profile change request.",
+    "privacy_request_ack": "We received your privacy request.",
+    "partner_response_received": "We received your response.",
+    "partner_invitation": "You were invited to the portal.",
+}
+APPLICATION_TEMPLATES = frozenset(
+    {
+        "application_submitted",
+        "information_requested",
+        "application_status_changed",
+        "application_decision",
+        "partner_response_received",
+    }
+)
+
+
+class RelatedRecord(BaseModel):
+    type: str  # application
+    reference: str
+
+
 class PartnerNotificationOut(BaseModel):
     id: uuid.UUID
-    template: str  # which message it was; content and links are never returned
+    template: str  # which message it was; email content is never returned
     title: str
+    description: str  # fixed text per template, no free text or tokens
+    related_record: RelatedRecord | None = None
+    # Portal-relative path for the related record (assumed frontend route; null when none)
+    link: str | None = None
     category: str  # application | account | acknowledgement | other
     related_reference: str | None  # application / enquiry reference, when the message has one
     delivery_status: str
@@ -174,6 +207,17 @@ def _notification_out(n: Notification) -> PartnerNotificationOut:
         id=n.id,
         template=n.template_key.value,
         title=TITLES.get(n.template_key.value, "Message from Coral Swift"),
+        description=DESCRIPTIONS.get(n.template_key.value, "A message was sent to you."),
+        related_record=(
+            RelatedRecord(type="application", reference=ref)
+            if isinstance(ref, str) and n.template_key.value in APPLICATION_TEMPLATES
+            else None
+        ),
+        link=(
+            f"/applications?reference={ref}"
+            if isinstance(ref, str) and n.template_key.value in APPLICATION_TEMPLATES
+            else None
+        ),
         category=n.notification_type.value
         if n.notification_type.value in ("application", "account", "acknowledgement")
         else "other",

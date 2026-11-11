@@ -4,11 +4,12 @@ from datetime import date, datetime
 from pydantic import BaseModel
 
 from app.modules.documents.constants import ATTACHABLE_STATUSES
+from app.modules.documents.scan import ScanStatusMixin
 from app.modules.partner_documents.constants import PartnerDocCategory
 from app.modules.partner_documents.models import PartnerDocument, PartnerDocumentVersion
 
 
-class VersionOut(BaseModel):
+class VersionOut(ScanStatusMixin):
     version_no: int
     original_filename: str
     content_type: str

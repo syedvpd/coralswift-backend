@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -29,6 +29,7 @@ class InformationRequestIn(BaseModel):
 
     body: Long
     requested_categories: list[PartnerDocCategory] = Field(default_factory=list, max_length=8)
+    due_date: date | None = Field(default=None, description="deadline shown to the partner")
 
 
 class NoteIn(BaseModel):
@@ -92,7 +93,11 @@ class DocumentReviewIn(BaseModel):
 
     @model_validator(mode="after")
     def _comment_for_negative(self) -> "DocumentReviewIn":
-        negative = (ReviewStatus.REJECTED, ReviewStatus.CLARIFICATION_NEEDED)
+        negative = (
+            ReviewStatus.REJECTED,
+            ReviewStatus.CLARIFICATION_NEEDED,
+            ReviewStatus.REPLACEMENT_REQUESTED,
+        )
         if self.status in negative and not self.comment:
             raise ValueError("a comment is required when rejecting or asking for clarification")
         return self
@@ -135,6 +140,7 @@ class ReviewerMessageOut(BaseModel):
     requested_categories: list[str] | None
     in_reply_to: uuid.UUID | None
     created_at: datetime
+    due_date: date | None = None
 
 
 class AuditItem(BaseModel):

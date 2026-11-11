@@ -31,9 +31,21 @@ def test_staff_see_revisions_activity_and_change_request_before_values(
         ).status_code
         == 200
     )
+    direct = client.put(
+        f"{P}/organization", headers=p.headers, json={"website": "https://new.example"}
+    )
+    assert direct.status_code == 409 and direct.json()["error"]["code"] == "CHANGE_REQUEST_REQUIRED"
+    first = client.post(
+        f"{P}/organization/change-requests",
+        headers=p.headers,
+        json={"changes": {"website": "https://new.example"}, "reason": "Moved"},
+    )
+    assert first.status_code == 201
     assert (
-        client.put(
-            f"{P}/organization", headers=p.headers, json={"website": "https://new.example"}
+        client.post(
+            f"{ADM}/profile-change-requests/{first.json()['data']['id']}/decide",
+            headers=sa,
+            json={"approve": True},
         ).status_code
         == 200
     )

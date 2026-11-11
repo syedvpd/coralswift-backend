@@ -2,6 +2,7 @@
 
 import uuid
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 
 from sqlalchemy import func, select
@@ -492,6 +493,34 @@ def open_request_count(db: Session, application_id: uuid.UUID) -> int:
         select(func.count())
         .select_from(ApplicationMessage)
         .where(
+            ApplicationMessage.application_id == application_id,
+            ApplicationMessage.kind == MessageKind.INFORMATION_REQUEST,
+            ApplicationMessage.status == MessageStatus.OPEN,
+        )
+    ).scalar_one()
+
+
+def decision_explanation(db: Session, app: PortalApplication) -> str | None:
+    """Latest reviewer-written, partner-safe note on a decision (never the internal reason)."""
+    if app.decided_at is None:
+        return None
+    return db.execute(
+        select(ApplicationStatusHistory.partner_note)
+        .where(
+            ApplicationStatusHistory.application_id == app.id,
+            ApplicationStatusHistory.partner_note.is_not(None),
+            ApplicationStatusHistory.to_status.in_(
+                [PortalStatus.REJECTED, PortalStatus.PILOT_ONBOARDING, PortalStatus.SCALE_UP]
+            ),
+        )
+        .order_by(ApplicationStatusHistory.created_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+
+
+def next_information_due(db: Session, application_id: uuid.UUID) -> date | None:
+    return db.execute(
+        select(func.min(ApplicationMessage.due_date)).where(
             ApplicationMessage.application_id == application_id,
             ApplicationMessage.kind == MessageKind.INFORMATION_REQUEST,
             ApplicationMessage.status == MessageStatus.OPEN,

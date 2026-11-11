@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -43,6 +43,8 @@ class ApplicationOut(BaseModel):
     last_updated: datetime
     decided_at: datetime | None
     open_information_requests: int
+    decision_explanation: str | None = None  # reviewer-written, partner-safe (D27)
+    next_information_due: date | None = None
 
 
 class ReadinessOut(BaseModel):
@@ -59,7 +61,12 @@ class PartnerHistoryItem(BaseModel):
     created_at: datetime
 
 
-def application_out(app: PortalApplication, open_requests: int) -> ApplicationOut:
+def application_out(
+    app: PortalApplication,
+    open_requests: int,
+    decision_explanation: str | None = None,
+    next_information_due: date | None = None,
+) -> ApplicationOut:
     return ApplicationOut(
         id=app.id,
         reference=app.reference,
@@ -72,6 +79,8 @@ def application_out(app: PortalApplication, open_requests: int) -> ApplicationOu
         last_updated=app.updated_at,
         decided_at=app.decided_at,
         open_information_requests=open_requests,
+        decision_explanation=decision_explanation,
+        next_information_due=next_information_due,
     )
 
 

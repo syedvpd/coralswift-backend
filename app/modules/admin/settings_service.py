@@ -16,6 +16,7 @@ from app.modules.admin.models import SystemSetting
 from app.modules.auth.constants import StaffRole, UserStatus
 from app.modules.auth.models import User
 from app.modules.enquiries.constants import EnquiryType
+from app.modules.partners.constants import EngagementPathway
 
 QUEUES = [t.value for t in EnquiryType]
 CONTACT_ITEMS = ["domain", "email", "address", "phone", "representative"]
@@ -54,6 +55,42 @@ def _text(v: str) -> str:
     return v
 
 
+def _categories(v: str) -> str:
+    """Comma list of document categories (D6: required documents per pathway, owner-defined)."""
+    from app.modules.partner_documents.constants import PartnerDocCategory
+
+    items = [i.strip() for i in v.split(",") if i.strip()]
+    if not items or len(set(items)) != len(items):
+        raise ValueError("a comma-separated list without duplicates")
+    valid = {c.value for c in PartnerDocCategory}
+    if any(i not in valid for i in items):
+        raise ValueError("unknown document category")
+    return ",".join(items)
+
+
+def _onboarding_template(v: str) -> str:
+    """JSON list of {name, required_action?, due_in_days?, document_category?} (D10)."""
+    import json
+
+    from app.modules.partner_documents.constants import PartnerDocCategory
+
+    data = json.loads(v)
+    if not isinstance(data, list) or len(data) > 50:
+        raise ValueError("a JSON list of at most 50 tasks")
+    valid = {c.value for c in PartnerDocCategory}
+    for t in data:
+        if (
+            not isinstance(t, dict)
+            or not isinstance(t.get("name"), str)
+            or not 1 <= len(t["name"]) <= 200
+            or set(t) - {"name", "required_action", "due_in_days", "document_category"}
+            or (t.get("due_in_days") is not None and not isinstance(t["due_in_days"], int))
+            or (t.get("document_category") is not None and t["document_category"] not in valid)
+        ):
+            raise ValueError("invalid task entry")
+    return json.dumps(data, separators=(",", ":"))
+
+
 def _domain(v: str) -> str:
     if not re.fullmatch(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}", v.lower()):
         raise ValueError("invalid domain")
@@ -69,11 +106,17 @@ def _phone(v: str) -> str:
 
 REGISTRY: dict[str, Callable[[str], str]] = {
     **{f"sla.{q}": _int(1, 24 * 90) for q in QUEUES},  # first-response target, hours
+    **{f"sla_escalation.{q}": _int(1, 24 * 90) for q in QUEUES},  # escalation target, hours
     **{f"route.owner.{q}": _uuid for q in QUEUES},  # default lead owner (staff user id)
     **{f"route.backup.{q}": _uuid for q in QUEUES},  # out-of-office cover for the owner
     **{f"escalation.email.{q}": _email for q in QUEUES},  # told when a target is missed
     "ack_promise_enabled": _bool,  # s.28: acknowledgement wording may promise the SLA only if true
     "retention.partner_document_days": _int(1, 3650),
+    **{f"required_documents.{p.value}": _categories for p in EngagementPathway},
+    "onboarding.template": _onboarding_template,
+    # Privacy targets: provisional 30 days / 72 h pending legal review; unset = no due date
+    "privacy.completion_days": _int(1, 365),
+    "privacy.verification_hours": _int(1, 720),
     "expiry_reminder_days": _int(1, 365),
     "contact.domain": _domain,
     "contact.email": _email,

@@ -61,6 +61,12 @@ class ContentItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     og_image_url: Mapped[str | None] = mapped_column(String(500))
     image_url: Mapped[str | None] = mapped_column(String(500))
     image_alt: Mapped[str | None] = mapped_column(String(200))
+    # Added in 0020: markdown/plain body flag, structured block data, last editor
+    body_format: Mapped[str] = mapped_column(String(10), default="plain", server_default="plain")
+    data: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT")
+    )
 
     __table_args__ = (
         CheckConstraint("slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'", name="slug_format"),

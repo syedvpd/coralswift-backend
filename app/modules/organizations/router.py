@@ -60,8 +60,8 @@ def editable_fields(ctx: PartnerDep) -> ApiResponse[list[EditableFieldOut]]:
         [
             EditableFieldOut(
                 name=name,
-                direct_update=True,
-                approval_required=False,
+                direct_update=name != "legal_name",  # empty fields only; see schema
+                approval_required=True,
                 nullable=name != "legal_name",
                 null_clears=name != "legal_name",
             )

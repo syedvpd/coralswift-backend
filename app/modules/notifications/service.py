@@ -14,6 +14,7 @@ from app.integrations.email import EmailDeliveryError, EmailMessage, EmailSender
 from app.modules.admin.models import NotificationTemplate
 from app.modules.enquiries.activity import log_activity
 from app.modules.enquiries.constants import ActorType, EnquiryType
+from app.modules.notifications import preferences
 from app.modules.notifications.constants import DeliveryStatus, NotificationType, TemplateKey
 from app.modules.notifications.models import Notification
 from app.modules.notifications.templates import render, render_override
@@ -53,6 +54,8 @@ def queue_notification(
 ) -> None:
     """Insert an outbox row; ON CONFLICT DO NOTHING on dedupe_key so a re-run never duplicates."""
     key = dedupe_key or f"{enquiry_id}:{template.value}:{recipient.lower()}"
+    if preferences.is_muted(db, recipient, kind):
+        return  # the partner opted out of this optional category
     db.execute(
         pg_insert(Notification)
         .values(

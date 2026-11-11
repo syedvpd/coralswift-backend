@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select
 
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
@@ -27,8 +27,10 @@ from app.modules.admin.schemas import (
     OrgRow,
     OrgStatusIn,
     OverviewOut,
+    StaffActivityRow,
     StaffInviteIn,
     StaffOut,
+    StaffProfileIn,
     StaffRoleIn,
     WorkloadOut,
 )
@@ -388,6 +390,68 @@ def invite_staff(
     return ok(_staff_out(user), "Invitation issued")
 
 
+@router.get(
+    "/users/{user_id}",
+    response_model=ApiResponse[StaffOut],
+    responses=_ERR,
+    summary="One staff account (super administrator)",
+)
+def get_staff_user(
+    user_id: uuid.UUID, staff: SuperAdminDep, db: DbSession
+) -> ApiResponse[StaffOut]:
+    return ok(_staff_out(service.get_staff(db, user_id)))
+
+
+@router.patch(
+    "/users/{user_id}",
+    response_model=ApiResponse[StaffOut],
+    responses=_ERR,
+    summary="Update a staff member's name (super administrator; role and status have own actions)",
+)
+def update_staff_user(
+    user_id: uuid.UUID, payload: StaffProfileIn, staff: SuperAdminDep, db: DbSession
+) -> ApiResponse[StaffOut]:
+    user = service.update_staff_profile(db, staff, user_id, payload.full_name)
+    return ok(_staff_out(user), "Profile updated")
+
+
+@router.get(
+    "/users/{user_id}/activity",
+    response_model=ApiResponse[list[StaffActivityRow]],
+    responses=_ERR,
+    summary="Audit events about or performed by one staff member (super administrator)",
+)
+def staff_user_activity(
+    user_id: uuid.UUID, staff: SuperAdminDep, db: DbSession, page: PageDep
+) -> ApiResponse[list[StaffActivityRow]]:
+    user = service.get_staff(db, user_id)
+    cond = or_(
+        and_(Activity.record_type == "user", Activity.record_id == user.id),
+        Activity.actor_user_id == user.id,
+    )
+    total = db.execute(select(func.count()).select_from(Activity).where(cond)).scalar_one()
+    acts = list(
+        db.execute(
+            select(Activity)
+            .where(cond)
+            .order_by(Activity.created_at.desc(), Activity.id.desc())
+            .limit(page.page_size)
+            .offset(page.offset)
+        ).scalars()
+    )
+    names = lookups.user_names(db, (a.actor_user_id for a in acts))
+    rows = [
+        StaffActivityRow(
+            action=a.action,
+            record_type=a.record_type,
+            actor_name=names.get(a.actor_user_id) if a.actor_user_id else None,
+            created_at=a.created_at,
+        )
+        for a in acts
+    ]
+    return ok(rows, meta=page_meta(page, total))
+
+
 @router.post("/users/{user_id}/role", response_model=ApiResponse[StaffOut], responses=_ERR)
 def change_role(
     user_id: uuid.UUID, payload: StaffRoleIn, staff: SuperAdminDep, db: DbSession
@@ -457,6 +521,9 @@ def audit(
                 actor_user_id=a.actor_user_id,
                 organization_id=a.organization_id,
                 request_id=a.request_id,
+                ip_address=a.ip_address,
+                user_agent=a.user_agent,
+                outcome=a.outcome,
                 meta=a.meta,
                 created_at=a.created_at,
                 actor_name=names.get(a.actor_user_id) if a.actor_user_id else None,
@@ -508,6 +575,9 @@ def audit_detail(
             actor_user_id=activity.actor_user_id,
             organization_id=activity.organization_id,
             request_id=activity.request_id,
+            ip_address=activity.ip_address,
+            user_agent=activity.user_agent,
+            outcome=activity.outcome,
             meta=activity.meta,
             created_at=activity.created_at,
             actor_name=names.get(activity.actor_user_id) if activity.actor_user_id else None,

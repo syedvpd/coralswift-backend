@@ -1,6 +1,7 @@
 """Partner-visible conversation tied to an application. Internal reviewer notes live elsewhere."""
 
 import uuid
+from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -27,6 +28,7 @@ def create_information_request(
     app: PortalApplication,
     body: str,
     categories: list[PartnerDocCategory],
+    due_date: date | None = None,
 ) -> ApplicationMessage:
     """Caller holds the application row lock. Moves the application to information_requested."""
     app_service.transition(
@@ -47,6 +49,7 @@ def create_information_request(
         author_user_id=staff.user.id,
         body=body,
         requested_categories=[c.value for c in categories] or None,
+        due_date=due_date,
         created_at=utcnow(),
     )
     db.add(message)

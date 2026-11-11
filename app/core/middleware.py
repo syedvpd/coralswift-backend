@@ -9,7 +9,7 @@ from starlette.datastructures import Headers, MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.core.constants import REQUEST_ID_HEADER
-from app.core.logging import request_id_var
+from app.core.logging import client_ip_var, request_id_var, user_agent_var
 
 logger = logging.getLogger("app.access")
 _SAFE_ID = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
@@ -28,6 +28,9 @@ class RequestContextMiddleware:
         request_id = incoming if _SAFE_ID.match(incoming) else uuid.uuid4().hex
         scope.setdefault("state", {})["request_id"] = request_id
         token = request_id_var.set(request_id)
+        client = scope.get("client")
+        ip_token = client_ip_var.set(client[0] if client else None)
+        ua_token = user_agent_var.set(Headers(scope=scope).get("user-agent", "")[:200] or None)
         started = perf_counter()
         status = 500
 
@@ -51,3 +54,5 @@ class RequestContextMiddleware:
                 },
             )
             request_id_var.reset(token)
+            client_ip_var.reset(ip_token)
+            user_agent_var.reset(ua_token)

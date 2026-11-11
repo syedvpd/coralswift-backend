@@ -6,6 +6,7 @@ class DeliveryStatus(enum.StrEnum):
     SENT = "sent"  # a real provider accepted the message
     LOGGED = "logged"  # console backend only: nothing was delivered
     FAILED = "failed"
+    BOUNCED = "bounced"  # provider reported a bounce or complaint (webhook)
 
 
 class NotificationType(enum.StrEnum):
@@ -13,6 +14,7 @@ class NotificationType(enum.StrEnum):
     INTERNAL = "internal"
     ACCOUNT = "account"
     APPLICATION = "application"
+    REPLY = "reply"  # staff-authored message to an enquirer
 
 
 class TemplateKey(enum.StrEnum):
@@ -35,3 +37,4 @@ class TemplateKey(enum.StrEnum):
     PRIVACY_REQUEST_ACK = "privacy_request_ack"
     EXPIRY_REMINDER = "expiry_reminder"
     PROFILE_CHANGE_DECISION = "profile_change_decision"
+    STAFF_REPLY = "staff_reply"

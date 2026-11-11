@@ -30,3 +30,4 @@ class ReviewStatus(enum.StrEnum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     CLARIFICATION_NEEDED = "clarification_needed"
+    REPLACEMENT_REQUESTED = "replacement_requested"  # staff ask for a new file

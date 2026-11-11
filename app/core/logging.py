@@ -9,6 +9,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
+client_ip_var: ContextVar[str | None] = ContextVar("client_ip", default=None)
+user_agent_var: ContextVar[str | None] = ContextVar("user_agent", default=None)
 
 _SENSITIVE_KEY = re.compile(
     r"password|passwd|token|secret|authorization|api[_-]?key|cookie|database_url", re.I

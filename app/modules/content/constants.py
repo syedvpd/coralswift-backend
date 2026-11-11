@@ -6,6 +6,10 @@ class ContentType(enum.StrEnum):
     FAQ = "faq"  # FAQ / self-service (s.15C)
     PAGE = "page"  # governed website page copy (s.28)
     RESOURCE = "resource"  # downloadable capability statement / approved document (s.15A/E)
+    HERO = "hero"  # homepage hero / banner block (structured `data`)
+    SERVICE = "service"
+    INDUSTRY = "industry"
+    NAVIGATION = "navigation"  # menu tree in `data.items`
 
 
 class ContentStatus(enum.StrEnum):

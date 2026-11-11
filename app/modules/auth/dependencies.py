@@ -153,3 +153,14 @@ ReviewerDep = Annotated[
     Depends(require_staff(StaffRole.PARTNER_REVIEWER, StaffRole.SUPER_ADMINISTRATOR)),
 ]
 SuperAdminDep = Annotated[StaffContext, Depends(require_staff(StaffRole.SUPER_ADMINISTRATOR))]
+# Read-only partner collaboration data: BDMs only for organisations assigned to them (D45).
+CollabReadDep = Annotated[
+    StaffContext,
+    Depends(
+        require_staff(
+            StaffRole.PARTNER_REVIEWER,
+            StaffRole.SUPER_ADMINISTRATOR,
+            StaffRole.BUSINESS_DEVELOPMENT_MANAGER,
+        )
+    ),
+]

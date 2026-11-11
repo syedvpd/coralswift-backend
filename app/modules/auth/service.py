@@ -190,9 +190,15 @@ def login(
         burn_verify(settings, password)
         raise _invalid_credentials()
     if user.locked_until and user.locked_until > now:
-        burn_verify(settings, password)
+        proved = verify_password(settings, user.password_hash, password)
         _audit(db, user, "auth.login_blocked_locked")
         db.commit()
+        if proved:  # only someone holding the password learns the account is locked
+            raise AppError(
+                "This account is temporarily locked after repeated failed sign-ins",
+                status_code=423,
+                code="ACCOUNT_LOCKED",
+            )
         raise _invalid_credentials()  # same response as a wrong password
     if not verify_password(settings, user.password_hash, password):
         user.failed_login_count += 1
@@ -366,6 +372,8 @@ def invite_partner_user(
             PartnerMembership.organization_id == organization.id,
         )
     ).scalar_one_or_none()
+    if membership is not None and membership.status is MembershipStatus.REMOVED:
+        membership.status, membership.role = MembershipStatus.ACTIVE, role  # cancelled invite
     if membership is None:
         db.add(PartnerMembership(organization_id=organization.id, user_id=user.id, role=role))
         try:

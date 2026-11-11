@@ -79,3 +79,7 @@ New `tests/api/test_review_inherited.py` (7 tests, passed): audit detail/actions
 - Local full regression: `280 passed, 0 failed`, one Starlette/httpx deprecation warning (184.32 s), using the local disposable test database. An earlier run without network access failed during fixture setup and is superseded by this run.
 - Ruff check: passed. Ruff format check: 245 files formatted. Mypy: no issues in 183 source files.
 - Live provider tests, frontend browser flow and deployment were not performed.
+
+## Verification (2026-11-11 requirements batch)
+Baseline before changes: full suite `333 passed` (local Postgres in Docker, database name ending `_test`). Changes: `ACCOUNT_LOCKED`, `GET/PATCH /admin/users/{id}`, `GET /admin/users/{id}/activity`, `GET /reviewer/workload`, `scan_status`. Final results are in the session report; see `docs/frontend-backend-requirements-tracker.md`.
+Final gates (2026-11-11): `ruff check` pass; `ruff format --check` 252 files clean; `mypy` 186 files no issues; `alembic heads` 0015 and `alembic check` "No new upgrade operations detected" on the local disposable DB; app builds; full `pytest`: **336 passed** (333 baseline + 3 new; two existing lock-out assertions were changed to the new 423 `ACCOUNT_LOCKED`). OpenAPI regenerated locally: 165 paths / 297 schemas. Not run: any live/remote check, deployed OpenAPI republish, remote DB revision check.

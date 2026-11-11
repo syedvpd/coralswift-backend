@@ -71,6 +71,7 @@ class MeOut(BaseModel):
     account_status: UserStatus
     staff_role: StaffRole | None = None
     partner_role: str | None = None  # owner | member (partner accounts)
+    permissions: list[str] = Field(default_factory=list)  # partner permissions, e.g. team.manage
     organization: OrganizationRef | None = None
     mfa_enabled: bool = False
     mfa_required: bool = False  # staff: enforced by deployment policy; partners: optional

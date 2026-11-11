@@ -91,3 +91,18 @@ class StaffNotification(UUIDPrimaryKeyMixin, Base):
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (Index("ix_staff_notifications_user_created", "user_id", "created_at"),)
+
+
+class NotificationTemplateVersion(UUIDPrimaryKeyMixin, Base):
+    """Append-only history of every saved version of a template override."""
+
+    __tablename__ = "notification_template_versions"
+
+    key: Mapped[str] = mapped_column(String(60), index=True)
+    version_no: Mapped[int] = mapped_column(Integer)
+    subject: Mapped[str] = mapped_column(String(200))
+    text_body: Mapped[str] = mapped_column(Text)
+    html_body: Mapped[str | None] = mapped_column(Text)
+    note: Mapped[str | None] = mapped_column(String(200))
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
