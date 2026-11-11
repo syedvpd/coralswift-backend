@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import String, cast, func, or_, select
 
 from app.common.pagination import PageDep, page_meta
@@ -274,14 +274,26 @@ def list_applications(
     )
 
 
+class TransitionRule(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    from_status: str = Field(alias="from")
+    to: str
+    needs_reason: bool
+    needs_assigned_reviewer: bool
+    dedicated_endpoint: bool
+
+
 @router.get(
     "/transitions",
-    response_model=ApiResponse[list[dict[str, Any]]],
+    response_model=ApiResponse[list[TransitionRule]],
+    response_model_by_alias=True,
     responses=_ERR,
     summary="Every status change a reviewer may make, with its requirements",
 )
-def reviewer_transitions(staff: ReviewerDep) -> ApiResponse[list[dict[str, Any]]]:
-    return ok(transitions.transition_table(transitions.Actor.REVIEWER))
+def reviewer_transitions(staff: ReviewerDep) -> ApiResponse[list[TransitionRule]]:
+    rules = transitions.transition_table(transitions.Actor.REVIEWER)
+    return ok([TransitionRule.model_validate(r) for r in rules])
 
 
 class ReviewDetailOut(BaseModel):

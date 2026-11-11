@@ -1,5 +1,9 @@
 # PRD Phase 3 - Admin Platform (backend)
 
+## Verification update (2026-11-11)
+
+The full local suite passes (280 tests). Development migrations `0013`-`0015` are applied at Alembic head `0015`. Workload covers enquiry counts only. Owner decisions and external configuration remain listed in the registers; live staff account/MFA verification was not performed.
+
 Date 2026-11-10. Evidence: commit `15ebe59` (254 tests passed locally). Uncommitted work from another agent is present in the working tree and is **not verified** here. Item-level detail: `DEVELOPER_REQUEST_TO_PRD_MAPPING.md`, `../backend-gap-audit.md`.
 
 ## Delivered and tested

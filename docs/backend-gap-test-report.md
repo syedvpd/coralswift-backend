@@ -70,3 +70,12 @@ New tests this session: `test_phase1_seo_privacy.py` (4), `test_phase2_account.p
 | OpenAPI regenerated | 162 paths, 280 schemas |
 | Not run | GitHub CI, Render, live providers, anything on Supabase |
 New tests: `test_phase3_org_history.py` (3). Changed: `test_gap_lists.py`.
+
+## Third pass (2026-11-10): review of inherited work, local only
+New `tests/api/test_review_inherited.py` (7 tests, passed): audit detail/actions/CSV authorisation and CSV safety, workload counts and strategic exclusion, document-history scoping, follow-up reports (strategic excluded for BDM, other roles denied), scheduled-publication negatives (draft, past, role, drafts never auto-published), field metadata / template placeholders / typed organisation detail (financial fields null for BDM), `discussion_type` filter. The five remaining untyped endpoints (`/auth/permissions`, `/catalog/*`, `/content/sitemap`, `/reviewer/transitions`) now have Pydantic schemas. One regression found and fixed (permissions response must omit `role_matrix` for non-super roles). OpenAPI: 162 paths, 291 schemas.
+
+## Current takeover verification (2026-11-11)
+- Remote development migration: `0012` before; applied `0013`, `0014`, `0015`; `0015` after. `alembic check`: no drift. Schema object verification is recorded in `docs/handoff/SUPABASE_MIGRATION_PLAN.md`. No backup was created, per owner instruction.
+- Local full regression: `280 passed, 0 failed`, one Starlette/httpx deprecation warning (184.32 s), using the local disposable test database. An earlier run without network access failed during fixture setup and is superseded by this run.
+- Ruff check: passed. Ruff format check: 245 files formatted. Mypy: no issues in 183 source files.
+- Live provider tests, frontend browser flow and deployment were not performed.

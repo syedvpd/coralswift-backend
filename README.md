@@ -125,7 +125,7 @@ Settings come from environment variables ([`.env.example`](.env.example) lists e
 |---|---|
 | App | `APP_ENV` (`development`, `testing`, `staging`, `production`), `DEBUG`, `LOG_LEVEL`, `PORTAL_BASE_URL` |
 | Database | `DATABASE_URL`; `TEST_DATABASE_URL` (a disposable local `*_test` database, used only by the test suite) |
-| Security | `SECRET_KEY`, `STAFF_MFA_REQUIRED`, `CORS_ALLOWED_ORIGINS`, `ALLOWED_HOSTS`, `RATE_LIMIT_PER_MINUTE`, `MAX_REQUEST_BODY_BYTES`, `CAPTCHA_ENABLED`, `TURNSTILE_SECRET_KEY` |
+| Security | `SECRET_KEY`, `STAFF_MFA_REQUIRED`, `CORS_ALLOWED_ORIGINS`, `ALLOWED_HOSTS`, `RATE_LIMIT_PER_MINUTE`, `MAX_REQUEST_BODY_BYTES`, `CAPTCHA_ENABLED`, `TURNSTILE_SECRET_KEY`, `TURNSTILE_ALLOWED_HOSTNAMES` |
 | Storage | `STORAGE_BACKEND` (`local` or `s3`), `S3_*` |
 | Email | `EMAIL_BACKEND` (`console` or `brevo`), `BREVO_API_KEY`, `EMAIL_SENDER_ADDRESS`, `EMAIL_RECIPIENT_ALLOWLIST`, `NOTIFY_*_EMAILS` |
 | Compliance | `PRIVACY_NOTICE_VERSION` |

@@ -28,8 +28,11 @@ class DocumentOut(BaseModel):
     response_model=ApiResponse[DocumentOut],
     dependencies=[Depends(rate_limit("upload", 2)), Depends(require_human)],
     responses={
+        403: {"model": ErrorResponse},
         413: {"model": ErrorResponse},
         415: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
         503: {"model": ErrorResponse},
     },
     summary="Upload a supporting document (private storage, quarantined)",

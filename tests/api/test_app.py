@@ -146,6 +146,7 @@ def test_docs_disabled_in_production(settings: Settings) -> None:
         email_sender_address="noreply@example.com",
         captcha_enabled=True,
         turnstile_secret_key="secret",
+        turnstile_allowed_hostnames=["coralswift.com"],
     )
     with TestClient(
         create_app(prod, storage=InMemoryStorage(), email_sender=RecordingEmail())

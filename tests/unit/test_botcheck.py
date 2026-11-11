@@ -6,8 +6,16 @@ from app.integrations.botcheck import NoopBotVerifier, TurnstileVerifier
 from tests.conftest import AppFactory
 
 
-def _verifier(handler: Callable[[httpx.Request], httpx.Response]) -> TurnstileVerifier:
-    return TurnstileVerifier("s", httpx.Client(transport=httpx.MockTransport(handler)))
+def _verifier(
+    handler: Callable[[httpx.Request], httpx.Response],
+    *,
+    allowed_hostnames: list[str] | None = None,
+) -> TurnstileVerifier:
+    return TurnstileVerifier(
+        "s",
+        httpx.Client(transport=httpx.MockTransport(handler)),
+        allowed_hostnames=allowed_hostnames,
+    )
 
 
 def test_turnstile_accepts_success_and_sends_secret() -> None:
@@ -35,6 +43,45 @@ def test_turnstile_fails_closed() -> None:
     assert not _verifier(boom).verify("tok", "ip")
     assert not _verifier(garbage).verify("tok", "ip")
     assert not _verifier(ok_false).verify(None, "ip")
+    assert not _verifier(ok_false).verify("   ", "ip")
+    assert not _verifier(ok_false).verify("x" * 2049, "ip")
+    assert not _verifier(lambda _: httpx.Response(502)).verify("tok", "ip")
+
+
+def test_turnstile_hostname_restriction() -> None:
+    v = _verifier(
+        lambda r: httpx.Response(200, json={"success": True, "hostname": "coralswift.com"}),
+        allowed_hostnames=["coralswift.com", "coralswift-ochre.vercel.app"],
+    )
+    assert v.verify("tok", "ip")
+
+    wrong = _verifier(
+        lambda r: httpx.Response(200, json={"success": True, "hostname": "evil.example"}),
+        allowed_hostnames=["coralswift.com"],
+    )
+    missing = _verifier(
+        lambda r: httpx.Response(200, json={"success": True}),
+        allowed_hostnames=["coralswift.com"],
+    )
+    assert not wrong.verify("tok", "ip")
+    assert not missing.verify("tok", "ip")
+
+
+def test_turnstile_whitespace_or_oversize_skips_provider_call() -> None:
+    called = 0
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal called
+        called += 1
+        return httpx.Response(200, json={"success": True})
+
+    v = _verifier(handler)
+    assert not v.verify(None, "ip")
+    assert not v.verify("   \t ", "ip")
+    assert not v.verify("a" * 2049, "ip")
+    assert called == 0
+    assert v.verify("  good-tok  ", "ip")
+    assert called == 1
 
 
 def test_noop_allows_everything() -> None:
@@ -49,6 +96,7 @@ def test_build_bot_verifier_selection() -> None:
     class S:
         captcha_enabled = False
         turnstile_secret_key = SecretStr("x")
+        turnstile_allowed_hostnames = ["coralswift.com"]
 
     assert isinstance(build_bot_verifier(S()), NoopBotVerifier)  # type: ignore[arg-type]
     S.captcha_enabled = True

@@ -1,5 +1,9 @@
 # Backend Gap Audit (2026-11-10)
 
+## Verification update (2026-11-11)
+
+Older rows and counts below are historical. Use `docs/phase-scope/REQUIREMENT_AUDIT_PHASES_1_3.md` for current Phase 1-3 requirement status and `docs/backend-gap-test-report.md` for verification evidence. The full local suite passes (280 tests); migrations `0013`-`0015` are applied to the verified development project at `0015`; stored OpenAPI matches runtime (162 paths / 291 schemas). Policy decisions and external setup remain open. Phase 4+ remains excluded.
+
 Input: "Coral Swift - Backend Gaps (all sessions, Phase 1 to Phase 29)". Each item was checked against the code, OpenAPI, migrations and tests of this repository, not taken from the register. Evidence tests are under `tests/`. Latest local run: **253 passed** (see `backend-gap-test-report.md`). No live provider, Supabase or deployed check was made for any item.
 
 **Status labels** (final set)

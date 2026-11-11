@@ -1,5 +1,9 @@
 # Codex Progress Matrix
 
+## Takeover verification update (2026-11-11)
+
+Latest verified state supersedes older migration/test notes below: development database `zibfzlwzaecapfrgjret` was at `0012`; approved additive migrations `0013`-`0015` are now applied and `0015` is head. `alembic check` is clean; remote schema objects were checked read-only. No backup was created, per explicit owner instruction. Full local regression: 280 passed; Ruff, formatting, mypy, a fresh local disposable migration, and OpenAPI comparison passed. OpenAPI matches at 162 paths / 291 schemas. Decisions and external setup remain open. No live test accounts, frontend browser flow, provider verification, or deployment was performed.
+
 Updated 2026-11-10 against the uncommitted working tree (base HEAD `15ebe59`). Statuses: CLOSED-TESTED, CLOSED-EXISTING, IMPLEMENTED-UNTESTED, BLOCKED-DECISION, BLOCKED-EXTERNAL, NOT CLOSED, N/A-JUSTIFIED. Behavior remains unverified while local PostgreSQL is unavailable. Decisions D1-D27: `docs/business-decisions-required.md`.
 
 | ID | Requirement | Current status | Evidence/files | Tests | Remaining action | Dependencies |

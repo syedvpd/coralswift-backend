@@ -20,7 +20,13 @@ router = APIRouter(prefix="/enquiries", tags=["enquiries"])
     status_code=201,
     response_model=ApiResponse[SubmissionOut],
     dependencies=SubmissionGuards,
-    responses={422: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
+    responses={
+        403: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        413: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+    },
     summary="Submit a partner application",
 )
 def submit_partner(

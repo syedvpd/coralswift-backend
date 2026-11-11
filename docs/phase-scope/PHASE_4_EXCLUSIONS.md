@@ -1,5 +1,9 @@
 # Excluded: PRD Phase 4 and later (not built, not defects)
 
+## Scope confirmation (2026-11-11)
+
+The takeover verification and migration work did not implement Phase 4+ functionality. Current Phase 1-3 backend status and test evidence are in `REQUIREMENT_AUDIT_PHASES_1_3.md` and `../backend-gap-test-report.md`.
+
 Date 2026-11-10. Evidence: commit `15ebe59` (254 tests passed locally). Uncommitted work from another agent is present in the working tree and is **not verified** here. Item-level detail: `DEVELOPER_REQUEST_TO_PRD_MAPPING.md`, `../backend-gap-audit.md`.
 
 Per PRD s.23 and the owner's instruction these are out of scope. The frontend asked for them under its own "Phase 30-34" labels; none is required for a Phase 1-3 acceptance criterion.

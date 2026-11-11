@@ -1,5 +1,9 @@
 # Developer Request -> PRD Phase 1-3 Mapping (2026-11-10)
 
+## Verification update (2026-11-11)
+
+Earlier status entries below are historical. The authoritative current statuses are in `REQUIREMENT_AUDIT_PHASES_1_3.md`; full local suite: 280 passed; development Alembic revision: `0015`; OpenAPI: 162 paths / 291 schemas. Supported integration details are in `frontend-backend-contract.md`. No test accounts were provisioned because approved account identifiers and secure credential delivery are not yet available. Frontend recommendations remain unapproved until the owner confirms them.
+
 Source: "Coral Swift - Backend Requests" (frontend, 2026-11-10). `BACKEND_GAPS.md` and `BACKEND_DEPENDENCY_REGISTER.md` are **not in this repository**; the gap register was used through `docs/backend-gap-audit.md` (item ids X, Phase, M). The developer's "Phase 4-37" labels are not PRD phases: scope is decided by the PRD s.23 release definitions only.
 
 **Evidence rules.** "Verified" means present in commit `15ebe59` and covered by tests that were executed (254 passed on 2026-11-10). The working tree also holds **uncommitted changes from another agent** (34 modified files, migration `0012`, `docs/handoff/*`) that this document did not verify; where they touch an item it is marked `uncommitted work present, unverified`. Nothing was committed, pushed or deployed for this document.

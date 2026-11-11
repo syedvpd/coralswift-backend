@@ -71,6 +71,7 @@ class Settings(BaseSettings):
     email_recipient_allowlist: Annotated[list[str], NoDecode] = Field(default_factory=list)
     captcha_enabled: bool = False  # explicit opt-in; production requires true
     turnstile_secret_key: SecretStr | None = None  # Cloudflare Turnstile secret
+    turnstile_allowed_hostnames: Annotated[list[str], NoDecode] = Field(default_factory=list)
     # Internal recipients per queue. Owners are an open PRD decision, so empty = no internal mail.
     notify_general_emails: Annotated[list[str], NoDecode] = Field(default_factory=list)
     notify_project_emails: Annotated[list[str], NoDecode] = Field(default_factory=list)
@@ -93,6 +94,7 @@ class Settings(BaseSettings):
     @field_validator(
         "cors_allowed_origins",
         "allowed_hosts",
+        "turnstile_allowed_hostnames",
         "notify_general_emails",
         "notify_project_emails",
         "notify_partner_emails",
@@ -134,13 +136,15 @@ class Settings(BaseSettings):
             problems.append("staging needs EMAIL_RECIPIENT_ALLOWLIST (internal test inboxes only)")
         if not self.captcha_enabled:
             problems.append("production needs CAPTCHA_ENABLED=true and TURNSTILE_SECRET_KEY")
+        if any("*" in hostname for hostname in self.turnstile_allowed_hostnames):
+            problems.append("TURNSTILE_ALLOWED_HOSTNAMES must not contain '*'")
         key = self.secret_key.get_secret_value()
         placeholder = any(m in key.lower() for m in ("change-me", "replace-with", "dev-only"))
         if len(key) < MIN_PRODUCTION_SECRET_LENGTH or placeholder:
             problems.append(f"SECRET_KEY must be random, >= {MIN_PRODUCTION_SECRET_LENGTH} chars")
         if self.debug:
             problems.append("DEBUG must be false")
-        if "*" in self.cors_allowed_origins:
+        if any("*" in origin for origin in self.cors_allowed_origins):
             problems.append("CORS_ALLOWED_ORIGINS must not contain '*'")
         if "*" in self.allowed_hosts or not self.allowed_hosts:
             problems.append("ALLOWED_HOSTS must be an explicit, non-empty host list")

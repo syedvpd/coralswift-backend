@@ -86,7 +86,7 @@ def create_app(
             "X-Lookup-Token",
             REQUEST_ID_HEADER,
         ],
-        expose_headers=[REQUEST_ID_HEADER],
+        expose_headers=[REQUEST_ID_HEADER, "Idempotent-Replay", "Retry-After"],
     )
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_request_body_bytes)
     app.add_middleware(SecurityHeadersMiddleware, hsts=settings.is_hardened)

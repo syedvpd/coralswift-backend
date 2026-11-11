@@ -22,3 +22,6 @@ Created 2026-11-09. Nothing here is decided. Until the owner answers, every affe
 | 16 | Calendar provider for meeting confirmation (or accept staff-attested confirmation) | Meetings are confirmed manually by staff today | new adapter | 1.5 | Business owner | OPEN |
 | 17 | Staging and production hostnames, frontend origins, Brevo sender domain | Needed for CORS, trusted hosts, Turnstile hostnames, SPF/DKIM/DMARC | env vars | 0.6, 1.26 | Owner / ops | OPEN |
 | 18 | Partner, client and testimonial publication data and permissions | Claims register is ready but empty | `/admin/content-claims` | 28.1, 28.2 | Business owner | OPEN |
+# Decision-register status update (2026-11-11)
+
+The frontend's recommendations are recorded as recommendations only in `docs/business-decisions-required.md`; none is treated as owner approval. Current implementation and audit evidence are in `docs/phase-scope/REQUIREMENT_AUDIT_PHASES_1_3.md`. Migrations `0013`-`0015` are applied to development (`0015` head); no backup was created, per owner instruction. Remaining policy decisions and the owner inputs required are listed in the business-decision document.

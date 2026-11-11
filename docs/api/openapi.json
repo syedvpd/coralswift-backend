@@ -1770,6 +1770,44 @@
     "title": "ApiResponse[OverviewOut]",
     "type": "object"
    },
+   "ApiResponse_PartnerCriteriaOut_": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PartnerCriteriaOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[PartnerCriteriaOut]",
+    "type": "object"
+   },
    "ApiResponse_PartnerDocumentRequestOut_": {
     "properties": {
      "data": {
@@ -1920,6 +1958,44 @@
      }
     },
     "title": "ApiResponse[PartnerPrivacyRequestOut]",
+    "type": "object"
+   },
+   "ApiResponse_PermissionsOut_": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PermissionsOut"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[PermissionsOut]",
     "type": "object"
    },
    "ApiResponse_PrivacyRequestOut_": {
@@ -2566,46 +2642,6 @@
      }
     },
     "title": "ApiResponse[WorkloadOut]",
-    "type": "object"
-   },
-   "ApiResponse_dict_str__Any__": {
-    "properties": {
-     "data": {
-      "anyOf": [
-       {
-        "additionalProperties": true,
-        "type": "object"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Data"
-     },
-     "message": {
-      "default": "Operation completed successfully",
-      "title": "Message",
-      "type": "string"
-     },
-     "meta": {
-      "anyOf": [
-       {
-        "additionalProperties": true,
-        "type": "object"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Meta"
-     },
-     "success": {
-      "default": true,
-      "title": "Success",
-      "type": "boolean"
-     }
-    },
-    "title": "ApiResponse[dict[str, Any]]",
     "type": "object"
    },
    "ApiResponse_dict_str__int__": {
@@ -3952,6 +3988,48 @@
     "title": "ApiResponse[list[PrivacyRequestOut]]",
     "type": "object"
    },
+   "ApiResponse_list_ProjectCategoryOut__": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/ProjectCategoryOut"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data"
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[list[ProjectCategoryOut]]",
+    "type": "object"
+   },
    "ApiResponse_list_PublicContent__": {
     "properties": {
      "data": {
@@ -4204,6 +4282,48 @@
     "title": "ApiResponse[list[SessionOut]]",
     "type": "object"
    },
+   "ApiResponse_list_SitemapEntry__": {
+    "properties": {
+     "data": {
+      "anyOf": [
+       {
+        "items": {
+         "$ref": "#/components/schemas/SitemapEntry"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Data"
+     },
+     "message": {
+      "default": "Operation completed successfully",
+      "title": "Message",
+      "type": "string"
+     },
+     "meta": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Meta"
+     },
+     "success": {
+      "default": true,
+      "title": "Success",
+      "type": "boolean"
+     }
+    },
+    "title": "ApiResponse[list[SitemapEntry]]",
+    "type": "object"
+   },
    "ApiResponse_list_StaffDocumentRequestOut__": {
     "properties": {
      "data": {
@@ -4372,14 +4492,13 @@
     "title": "ApiResponse[list[TemplatePlaceholderOut]]",
     "type": "object"
    },
-   "ApiResponse_list_dict_str__Any___": {
+   "ApiResponse_list_TransitionRule__": {
     "properties": {
      "data": {
       "anyOf": [
        {
         "items": {
-         "additionalProperties": true,
-         "type": "object"
+         "$ref": "#/components/schemas/TransitionRule"
         },
         "type": "array"
        },
@@ -4412,7 +4531,7 @@
       "type": "boolean"
      }
     },
-    "title": "ApiResponse[list[dict[str, Any]]]",
+    "title": "ApiResponse[list[TransitionRule]]",
     "type": "object"
    },
    "ApiResponse_list_str__": {
@@ -5798,6 +5917,39 @@
     "title": "ContentUpdate",
     "type": "object"
    },
+   "CriterionOut": {
+    "properties": {
+     "applies_to": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       }
+      ],
+      "title": "Applies To"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "threshold": {
+      "title": "Threshold",
+      "type": "string"
+     }
+    },
+    "required": [
+     "key",
+     "threshold",
+     "applies_to"
+    ],
+    "title": "CriterionOut",
+    "type": "object"
+   },
    "DecisionIn": {
     "additionalProperties": false,
     "properties": {
@@ -6434,6 +6586,24 @@
      "supporting_version_ids"
     ],
     "title": "EligibilityOut",
+    "type": "object"
+   },
+   "EndpointRef": {
+    "properties": {
+     "method": {
+      "title": "Method",
+      "type": "string"
+     },
+     "path": {
+      "title": "Path",
+      "type": "string"
+     }
+    },
+    "required": [
+     "method",
+     "path"
+    ],
+    "title": "EndpointRef",
     "type": "object"
    },
    "EngagementPathway": {
@@ -8423,6 +8593,27 @@
     "title": "MfaVerifyIn",
     "type": "object"
    },
+   "ModulePermission": {
+    "properties": {
+     "endpoints": {
+      "items": {
+       "$ref": "#/components/schemas/EndpointRef"
+      },
+      "title": "Endpoints",
+      "type": "array"
+     },
+     "module": {
+      "title": "Module",
+      "type": "string"
+     }
+    },
+    "required": [
+     "module",
+     "endpoints"
+    ],
+    "title": "ModulePermission",
+    "type": "object"
+   },
    "NewsletterIn": {
     "additionalProperties": false,
     "properties": {
@@ -9466,6 +9657,48 @@
     "title": "PartnerApplicationIn",
     "type": "object"
    },
+   "PartnerCriteriaOut": {
+    "properties": {
+     "criteria": {
+      "items": {
+       "$ref": "#/components/schemas/CriterionOut"
+      },
+      "title": "Criteria",
+      "type": "array"
+     },
+     "disclaimer": {
+      "title": "Disclaimer",
+      "type": "string"
+     },
+     "pathways": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Pathways",
+      "type": "array"
+     },
+     "status": {
+      "title": "Status",
+      "type": "string"
+     },
+     "submission_checklist": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Submission Checklist",
+      "type": "array"
+     }
+    },
+    "required": [
+     "status",
+     "disclaimer",
+     "criteria",
+     "pathways",
+     "submission_checklist"
+    ],
+    "title": "PartnerCriteriaOut",
+    "type": "object"
+   },
    "PartnerDocCategory": {
     "description": "PRD s.8 initial submission items (+ authorised-contact evidence 'where required').",
     "enum": [
@@ -9910,6 +10143,56 @@
      "email"
     ],
     "title": "PasswordResetRequestIn",
+    "type": "object"
+   },
+   "PermissionsOut": {
+    "properties": {
+     "account_type": {
+      "title": "Account Type",
+      "type": "string"
+     },
+     "modules": {
+      "items": {
+       "$ref": "#/components/schemas/ModulePermission"
+      },
+      "title": "Modules",
+      "type": "array"
+     },
+     "role_matrix": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Role Matrix"
+     },
+     "staff_role": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Staff Role"
+     }
+    },
+    "required": [
+     "account_type",
+     "staff_role",
+     "modules"
+    ],
+    "title": "PermissionsOut",
     "type": "object"
    },
    "PortalStatus": {
@@ -10360,6 +10643,34 @@
     ],
     "title": "ProjectCategory",
     "type": "string"
+   },
+   "ProjectCategoryOut": {
+    "properties": {
+     "group": {
+      "title": "Group",
+      "type": "string"
+     },
+     "illustrative": {
+      "title": "Illustrative",
+      "type": "boolean"
+     },
+     "label_note": {
+      "title": "Label Note",
+      "type": "string"
+     },
+     "value": {
+      "title": "Value",
+      "type": "string"
+     }
+    },
+    "required": [
+     "value",
+     "group",
+     "illustrative",
+     "label_note"
+    ],
+    "title": "ProjectCategoryOut",
+    "type": "object"
    },
    "ProjectEnquiryIn": {
     "additionalProperties": false,
@@ -11680,6 +11991,25 @@
     "title": "SettingsOut",
     "type": "object"
    },
+   "SitemapEntry": {
+    "properties": {
+     "slug": {
+      "title": "Slug",
+      "type": "string"
+     },
+     "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+     }
+    },
+    "required": [
+     "slug",
+     "updated_at"
+    ],
+    "title": "SitemapEntry",
+    "type": "object"
+   },
    "Slot": {
     "additionalProperties": false,
     "properties": {
@@ -12335,6 +12665,39 @@
      "to_status"
     ],
     "title": "TransitionIn",
+    "type": "object"
+   },
+   "TransitionRule": {
+    "properties": {
+     "dedicated_endpoint": {
+      "title": "Dedicated Endpoint",
+      "type": "boolean"
+     },
+     "from": {
+      "title": "From",
+      "type": "string"
+     },
+     "needs_assigned_reviewer": {
+      "title": "Needs Assigned Reviewer",
+      "type": "boolean"
+     },
+     "needs_reason": {
+      "title": "Needs Reason",
+      "type": "boolean"
+     },
+     "to": {
+      "title": "To",
+      "type": "string"
+     }
+    },
+    "required": [
+     "from",
+     "to",
+     "needs_reason",
+     "needs_assigned_reviewer",
+     "dedicated_endpoint"
+    ],
+    "title": "TransitionRule",
     "type": "object"
    },
    "TurnoverRange": {
@@ -23793,7 +24156,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/ApiResponse_dict_str__Any__"
+         "$ref": "#/components/schemas/ApiResponse_PermissionsOut_"
         }
        }
       },
@@ -24068,7 +24431,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/ApiResponse_dict_str__Any__"
+         "$ref": "#/components/schemas/ApiResponse_PartnerCriteriaOut_"
         }
        }
       },
@@ -24089,7 +24452,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/ApiResponse_list_dict_str__Any___"
+         "$ref": "#/components/schemas/ApiResponse_list_ProjectCategoryOut__"
         }
        }
       },
@@ -24233,7 +24596,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/ApiResponse_list_dict_str__Any___"
+         "$ref": "#/components/schemas/ApiResponse_list_SitemapEntry__"
         }
        }
       },
@@ -24452,6 +24815,16 @@
       },
       "description": "Successful Response"
      },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
      "413": {
       "content": {
        "application/json": {
@@ -24476,11 +24849,21 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
+         "$ref": "#/components/schemas/ErrorResponse"
         }
        }
       },
-      "description": "Validation Error"
+      "description": "Unprocessable Entity"
+     },
+     "429": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Too Many Requests"
      },
      "503": {
       "content": {
@@ -24559,6 +24942,16 @@
       },
       "description": "Successful Response"
      },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
      "409": {
       "content": {
        "application/json": {
@@ -24568,6 +24961,16 @@
        }
       },
       "description": "Conflict"
+     },
+     "413": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Request Entity Too Large"
      },
      "422": {
       "content": {
@@ -24657,6 +25060,36 @@
       },
       "description": "Successful Response"
      },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "413": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Request Entity Too Large"
+     },
      "422": {
       "content": {
        "application/json": {
@@ -24743,6 +25176,36 @@
        }
       },
       "description": "Successful Response"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "413": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Request Entity Too Large"
      },
      "422": {
       "content": {
@@ -24831,6 +25294,36 @@
        }
       },
       "description": "Successful Response"
+     },
+     "403": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Forbidden"
+     },
+     "409": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Conflict"
+     },
+     "413": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorResponse"
+        }
+       }
+      },
+      "description": "Request Entity Too Large"
      },
      "422": {
       "content": {
@@ -30324,7 +30817,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "$ref": "#/components/schemas/ApiResponse_list_dict_str__Any___"
+         "$ref": "#/components/schemas/ApiResponse_list_TransitionRule__"
         }
        }
       },

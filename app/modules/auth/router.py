@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated, Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.common.responses import ApiResponse, ErrorResponse, ok
@@ -176,17 +177,35 @@ def change_password(
     return ok(None, "Password updated")
 
 
+class EndpointRef(BaseModel):
+    method: str
+    path: str
+
+
+class ModulePermission(BaseModel):
+    module: str
+    endpoints: list[EndpointRef]
+
+
+class PermissionsOut(BaseModel):
+    account_type: str
+    staff_role: str | None
+    modules: list[ModulePermission]
+    role_matrix: dict[str, list[str]] | None = None  # super administrators only
+
+
 @router.get(
     "/permissions",
-    response_model=ApiResponse[dict[str, Any]],
+    response_model=ApiResponse[PermissionsOut],
+    response_model_exclude_none=True,  # role_matrix is present only for super administrators
     responses=_ERR,
     summary="Endpoints this account may call, derived from the live route guards",
 )
-def my_permissions(auth: AuthDep, request: Request) -> ApiResponse[dict[str, Any]]:
+def my_permissions(auth: AuthDep, request: Request) -> ApiResponse[PermissionsOut]:
     data = permissions_for(request.app, auth.user.user_type, auth.user.staff_role)
     if auth.user.staff_role is StaffRole.SUPER_ADMINISTRATOR:
         data["role_matrix"] = role_matrix(request.app)
-    return ok(data)
+    return ok(PermissionsOut.model_validate(data))
 
 
 def _me_out(db: DbSession, settings: Settings, user: User) -> MeOut:

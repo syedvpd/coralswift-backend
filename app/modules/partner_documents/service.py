@@ -118,9 +118,13 @@ def _store_version(
         raise AppError(
             "File storage is unavailable", status_code=503, code="STORAGE_UNAVAILABLE"
         ) from None
-    # Finalise under the document lock so concurrent replacements keep the highest version current.
+    # Finalise under the document lock so concurrent replacements keep the highest version current;
+    # populate_existing prevents stale identity-map reads when expire_on_commit=False.
     locked = db.execute(
-        select(PartnerDocument).where(PartnerDocument.id == doc.id).with_for_update()
+        select(PartnerDocument)
+        .where(PartnerDocument.id == doc.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     ).scalar_one()
     version.upload_status = UploadStatus.QUARANTINED  # no malware scanner configured
     locked.current_version_no = max(locked.current_version_no, version.version_no)

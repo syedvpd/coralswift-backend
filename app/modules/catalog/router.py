@@ -1,9 +1,8 @@
 """Read-only public reference data derived from the PRD: illustrative project categories (s.9),
 proposed partner criteria and pathways (s.8), and confirmed contact details (s.28)."""
 
-from typing import Any
-
 from fastapi import APIRouter, Response
+from pydantic import BaseModel
 
 from app.common.responses import ApiResponse, ok
 from app.database.dependencies import DbSession
@@ -26,25 +25,46 @@ CHECKLIST = [
 ]
 
 
+class ProjectCategoryOut(BaseModel):
+    value: str
+    group: str  # it | non_it
+    illustrative: bool
+    label_note: str
+
+
+class CriterionOut(BaseModel):
+    key: str
+    threshold: str
+    applies_to: str | list[str]  # text until the owner confirms the pathways
+
+
+class PartnerCriteriaOut(BaseModel):
+    status: str
+    disclaimer: str
+    criteria: list[CriterionOut]
+    pathways: list[str]
+    submission_checklist: list[str]
+
+
 def _cache(response: Response) -> None:
     response.headers["Cache-Control"] = "public, max-age=300"
 
 
 @router.get(
     "/catalog/project-categories",
-    response_model=ApiResponse[list[dict[str, Any]]],
+    response_model=ApiResponse[list[ProjectCategoryOut]],
     summary="Project categories, always labelled illustrative (PRD s.9, s.28)",
 )
-def project_categories(response: Response) -> ApiResponse[list[dict[str, Any]]]:
+def project_categories(response: Response) -> ApiResponse[list[ProjectCategoryOut]]:
     _cache(response)
     return ok(
         [
-            {
-                "value": c.value,
-                "group": category_group(c),
-                "illustrative": True,
-                "label_note": ILLUSTRATIVE_NOTE,
-            }
+            ProjectCategoryOut(
+                value=c.value,
+                group=category_group(c),
+                illustrative=True,
+                label_note=ILLUSTRATIVE_NOTE,
+            )
             for c in ProjectCategory
         ]
     )
@@ -52,10 +72,10 @@ def project_categories(response: Response) -> ApiResponse[list[dict[str, Any]]]:
 
 @router.get(
     "/catalog/partner-criteria",
-    response_model=ApiResponse[dict[str, Any]],
+    response_model=ApiResponse[PartnerCriteriaOut],
     summary="Proposed screening criteria, pathways and submission checklist (PRD s.8)",
 )
-def partner_criteria(response: Response) -> ApiResponse[dict[str, Any]]:
+def partner_criteria(response: Response) -> ApiResponse[PartnerCriteriaOut]:
     _cache(response)
     return ok(
         {

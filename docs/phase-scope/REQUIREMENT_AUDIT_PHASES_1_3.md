@@ -13,7 +13,7 @@ Sources: PRD v2.0 s.8-14, 15 (B,C,E,H), 16-19, 21, 28; Frontend Backend Requests
 | P1-03 | Insights/articles with search, tags, category, related items | IMPLEMENTED_AND_TESTED | `GET /content?q&tag&category`, detail `related` | test_content_engagement | - | - |
 | P1-04 | FAQ and downloadable resources with version label | IMPLEMENTED_AND_TESTED | content types `faq`, `resource`; `GET /content/{slug}/download` | test_content_attachment_download | - | - |
 | P1-05 | Only published, approved content is public; drafts/unpublished hidden | IMPLEMENTED_AND_TESTED | `content/service.list_public`, `get_public` | test_content_workflow_and_public_visibility, test_phase1_seo_privacy | - | - |
-| P1-06 | Scheduled publication behaviour | IMPLEMENTED_BUT_NOT_FULLY_VERIFIED | `POST/DELETE /admin/content/{id}/schedule`, maintenance job; migration 0012 (earlier agent) | test_scheduled_content_contract_and_maintenance_publish (passes) | Independent code review | - |
+| P1-06 | Scheduled publication behaviour | IMPLEMENTED_AND_TESTED | `POST/DELETE /admin/content/{id}/schedule`, maintenance job; migration 0012 (earlier agent) - independently reviewed 2026-11-10 | test_scheduled_publication_negative_cases, test_scheduled_content_contract_and_maintenance_publish | - | - |
 | P1-07 | SEO metadata: title, description, canonical, Open Graph, cover image (https only) | IMPLEMENTED_AND_TESTED | 8 nullable fields on content, public and admin | test_phase1_seo_privacy (3) | - | - |
 | P1-08 | XML sitemap data | IMPLEMENTED_AND_TESTED | `GET /content/sitemap` | test_content_engagement | robots.txt and HTML head are frontend | - |
 | P1-09 | Media library (upload/manage site images) | EXTERNAL_CONFIGURATION_BLOCKED | Cover images are referenced by https URL; no upload store for public media | - | Needs a public media bucket/CDN choice | D23 + hosting |
@@ -36,7 +36,8 @@ Sources: PRD v2.0 s.8-14, 15 (B,C,E,H), 16-19, 21, 28; Frontend Backend Requests
 | P1-26 | Optional attachments: type, size, content checks, private storage, quarantine | IMPLEMENTED_AND_TESTED | `POST /documents/upload`, limits at `/admin/security-policy` | test_documents_status_security | - | - |
 | P1-27 | Malware scanning | NOT_APPLICABLE_WITH_JUSTIFICATION | Owner formally accepted quarantine-only uploads (2026-11-10); nothing claims a scan | - | - | Owner decision recorded |
 | P1-28 | Rate limiting, duplicate-submission handling and idempotency | IMPLEMENTED_AND_TESTED | `core/protection.py`, `common/idempotency.py` | test_rate_limit, test_idempotency (10) | - | - |
-| P1-29 | Bot protection (Cloudflare Turnstile, fails closed, required in staging/production) | IMPLEMENTED_BUT_NOT_FULLY_VERIFIED | `integrations/botcheck.py`, `CAPTCHA_ENABLED` | unit/test_botcheck (mock Cloudflare) | A valid real token has never been accepted | Turnstile hostnames |
+| P1-29 | Bot protection: server-side Turnstile validation, fails closed, required in staging/production | IMPLEMENTED_AND_TESTED | `integrations/botcheck.py`, explicit non-wildcard `TURNSTILE_ALLOWED_HOSTNAMES` required in hardened environments | unit/test_botcheck, public readiness tests (mock Cloudflare, hostname mismatch, API 403 cases) | Live real-token verification remains external (P1-29b) | - |
+| P1-29b | Live Turnstile verification with a real token | EXTERNAL_CONFIGURATION_BLOCKED | Secret accepted by Cloudflare; a valid real token never observed | - | Add hostnames to the widget and test from the frontend | Cloudflare |
 | P1-30 | Failure handling: no silent loss, admin visibility and retry of failed emails | IMPLEMENTED_AND_TESTED | `/admin/notifications`, retry; transactional submit | test_notification_failure_visibility_and_retry, test_db_failure_rolls_back_everything_and_sends_no_email | - | - |
 | P1-31 | Submission status lookup by token | IMPLEMENTED_AND_TESTED | `GET /enquiries/{ref}/status` | test_status_with_token_returns_minimal_fields | - | - |
 | P1-32 | Privacy requests with email-confirmation identity check | IMPLEMENTED_AND_TESTED | `POST /privacy/requests`, `/verify` | test_phase1_seo_privacy (2) | - | - |
@@ -67,7 +68,7 @@ Sources: PRD v2.0 s.8-14, 15 (B,C,E,H), 16-19, 21, 28; Frontend Backend Requests
 | P2-14 | Role-specific partner permissions beyond owner/member | BUSINESS_DECISION_BLOCKED | Two roles | - | Decision | D22 |
 | P2-15 | Company profile (PRD s.12 fields) with completion indicator | IMPLEMENTED_AND_TESTED | `/partner/organization`, `/completion` | test_profile_update_completion_and_history | - | - |
 | P2-16 | Extra profile fields (trading name, industry, offices, ...) | BUSINESS_DECISION_BLOCKED | Not in the PRD field list | - | Decision | D20 |
-| P2-17 | Editable-field metadata and null-clearing | IMPLEMENTED_BUT_NOT_FULLY_VERIFIED | `GET /partner/organization/editable-fields` (earlier agent) | test_gap_lists sweep, test_organizations | Independent code review | - |
+| P2-17 | Editable-field metadata and null-clearing | IMPLEMENTED_AND_TESTED | `GET /partner/organization/editable-fields` (earlier agent) - independently reviewed 2026-11-10 | test_field_metadata_templates_and_typed_details_have_stable_contracts | - | - |
 | P2-18 | Profile change requests with staff decision | IMPLEMENTED_AND_TESTED | `/partner/organization/change-requests`, `/admin/profile-change-requests` | test_profile_change_request_flow_and_partner_extras, test_phase3_org_history | - | - |
 | P2-19 | Revision history with before/after values | IMPLEMENTED_AND_TESTED | `/partner/organization/history`, `/admin/organizations/{id}/revisions` | test_phase3_org_history | - | - |
 | P2-20 | Application draft, readiness checklist, submit, withdraw, resubmit | IMPLEMENTED_AND_TESTED | `/partner/applications/*` | test_applications (5), test_audit_e2e | - | - |
@@ -97,7 +98,7 @@ Sources: PRD v2.0 s.8-14, 15 (B,C,E,H), 16-19, 21, 28; Frontend Backend Requests
 | P3-02 | Self-modification and last-super-admin safeguards | IMPLEMENTED_AND_TESTED | `SELF_CHANGE`, `LAST_SUPER_ADMIN` | test_self_and_last_super_admin_protections_hold | - | - |
 | P3-03 | Staff user list/detail/invite/role/activate and account administration | IMPLEMENTED_AND_TESTED | `/admin/users`, `/admin/accounts*` | test_gap_accounts, test_gap_lists | - | - |
 | P3-04 | Assignee lookup for every staff role | IMPLEMENTED_AND_TESTED | `/admin/assignees` | test_assignee_picker_is_open_to_staff_and_exposes_names_only | - | - |
-| P3-05 | Dashboard overview (typed) and KPIs (typed, aggregate in SQL) | IMPLEMENTED_BUT_NOT_FULLY_VERIFIED | `/admin/overview`, `/admin/reports/kpis` (typed by earlier agent) | test_kpis, test_typed_aggregate_reports_and_role_scopes | Independent code review | - |
+| P3-05 | Dashboard overview (typed) and KPIs (typed, aggregate in SQL) | IMPLEMENTED_AND_TESTED | `/admin/overview`, `/admin/reports/kpis` (typed by earlier agent) - independently reviewed 2026-11-10 | test_kpis, test_typed_aggregate_reports_and_role_scopes, test_review_inherited | - | - |
 | P3-06 | Pending / approved application counts | BUSINESS_DECISION_BLOCKED | No approved status | - | Decision | D7 |
 | P3-07 | Recent decisions with timestamps; documents awaiting verification | IMPLEMENTED_AND_TESTED | `decided_at`; `/admin/documents?review_status=pending` | test_gap_applications, test_gap_reference | - | - |
 | P3-08 | Application list: search, filters, sort, pagination, contact, names | IMPLEMENTED_AND_TESTED | `/reviewer/applications` | test_gap_applications | - | - |
@@ -114,22 +115,22 @@ Sources: PRD v2.0 s.8-14, 15 (B,C,E,H), 16-19, 21, 28; Frontend Backend Requests
 | P3-19 | Reply / external message to requesters from the console | BUSINESS_DECISION_BLOCKED | Contact logged only | - | Decision | D15 |
 | P3-20 | Enquiry status workflow and extra statuses | BUSINESS_DECISION_BLOCKED | Any status settable | - | Decision | D8 |
 | P3-21 | Strategic confidentiality across list, detail, search, CSV, documents, audit, outbox, feed, KPIs | IMPLEMENTED_AND_TESTED | `visible_types`, query-level | test_strategic_confidentiality (3), test_phase3_feed, test_phase3_org_history | - | - |
-| P3-22 | Strategic discussion-type classification and filter | IMPLEMENTED_BUT_NOT_FULLY_VERIFIED | `discussion_type` filter (earlier agent) | test_gap_enquiries (discussion_type referenced) | Independent review | - |
+| P3-22 | Strategic discussion-type classification and filter | IMPLEMENTED_AND_TESTED | `discussion_type` filter (earlier agent) - independently reviewed 2026-11-10 | test_discussion_type_filter_is_validated_and_confidential | - | - |
 | P3-23 | Strategic queue/owner/response-target mechanism | IMPLEMENTED_AND_TESTED | settings keys for `strategic` | test_section28 | - | - |
 | P3-24 | Strategic assessment outcome workflow; BDM access to strategic | BUSINESS_DECISION_BLOCKED | BDM none by default | - | Decisions | D8, D12 |
-| P3-25 | Organisation list/detail with filters, sort, contact; typed detail | IMPLEMENTED_BUT_NOT_FULLY_VERIFIED | `/admin/organizations*` | test_organization_list_filters_sort_and_contact | Detail schema review | - |
+| P3-25 | Organisation list/detail with filters, sort, contact; typed detail | IMPLEMENTED_AND_TESTED | `/admin/organizations*` - independently reviewed 2026-11-10 | test_field_metadata_templates_and_typed_details_have_stable_contracts (financial fields null for BDM) | - | - |
 | P3-26 | Organisation history: revisions and activity (strategic events excluded) | IMPLEMENTED_AND_TESTED | `/admin/organizations/{id}/revisions`, `/activity` | test_phase3_org_history (2) | - | - |
 | P3-27 | Staff edit of a partner profile | BUSINESS_DECISION_BLOCKED | Change-request flow instead | - | Decision | D19 |
 | P3-28 | Change-request review with before/after values | IMPLEMENTED_AND_TESTED | `before` on pending requests; revisions after approval | test_staff_see_revisions_activity_and_change_request_before_values | - | - |
 | P3-29 | Partner accounts: list, detail, invitation resend/revoke, suspend/reactivate, reset | IMPLEMENTED_AND_TESTED | `/admin/accounts*` | test_gap_accounts (6) | - | - |
 | P3-30 | Global document queue with role-scoped visibility | IMPLEMENTED_AND_TESTED | `GET /admin/documents` | test_document_queue_scope_filters_and_no_storage_details | - | - |
-| P3-31 | Document review history, enquiry attachment list, document-level notes | IMPLEMENTED_BUT_NOT_FULLY_VERIFIED | `/admin/documents/{id}/history`, `/admin/enquiries/{id}/documents` (earlier agent); `review_comment` | test_replace_keeps_history_and_download_audited, test_admin | Independent review | - |
+| P3-31 | Document review history, enquiry attachment list, document-level notes | IMPLEMENTED_AND_TESTED | `/admin/documents/{id}/history`, `/admin/enquiries/{id}/documents` (earlier agent); `review_comment` - independently reviewed 2026-11-10 | test_document_history_is_scoped_to_assigned_organisations, test_strategic_confidentiality | - | - |
 | P3-32 | Additional-document request management for staff | IMPLEMENTED_AND_TESTED | `/reviewer/applications/{id}/document-requests`, cancel | test_phase2_document_requests | - | - |
 | P3-33 | Admin upload/replace of partner documents | BUSINESS_DECISION_BLOCKED | Partners own documents | - | Decision | D17 |
-| P3-34 | Reviewer assignment workload report | IMPLEMENTED_BUT_NOT_FULLY_VERIFIED | `GET /admin/workload` (earlier agent) | test_gap_enquiries (workload totals) | Independent review | - |
+| P3-34 | Reviewer assignment workload report | IMPLEMENTED_AND_TESTED | `GET /admin/workload` (earlier agent) - independently reviewed 2026-11-10 | test_workload_counts_match_the_data_and_hide_strategic_from_bdm | - | - |
 | P3-35 | Staff in-app notification feed with read/archive | IMPLEMENTED_AND_TESTED | `/admin/feed*` | test_phase3_feed (2) | - | - |
 | P3-36 | Typed outbox rows with filters and strategic flag | IMPLEMENTED_AND_TESTED | `GET /admin/notifications` | test_outbox_rows_are_typed_filterable_and_flag_strategic | - | - |
-| P3-37 | Notification templates: override, validate, preview, placeholder list | IMPLEMENTED_BUT_NOT_FULLY_VERIFIED | `/admin/notification-templates*` | test_template_override_is_used_and_validated; placeholders in test_ops | Independent review of placeholders | - |
+| P3-37 | Notification templates: override, validate, preview, placeholder list | IMPLEMENTED_AND_TESTED | `/admin/notification-templates*` - independently reviewed 2026-11-10 | test_template_override_is_used_and_validated, test_review_inherited | - | - |
 | P3-38 | Template version history | NOT_APPLICABLE_WITH_JUSTIFICATION | PRD s.14 lists templates and settings, no version history | - | - | - |
 | P3-39 | Communication history per record | IMPLEMENTED_AND_TESTED | follow-ups `communication` + activity feed | test_gap_enquiries | - | - |
 | P3-40 | Delivery/open receipts | EXTERNAL_CONFIGURATION_BLOCKED | Outbox status only | - | Brevo webhooks + verified domain | Domain |
@@ -138,9 +139,9 @@ Sources: PRD v2.0 s.8-14, 15 (B,C,E,H), 16-19, 21, 28; Frontend Backend Requests
 | P3-43 | CMS media library; homepage/navigation/rich-text structures | EXTERNAL_CONFIGURATION_BLOCKED | see P1-02, P1-09 | - | Content model + media hosting | D23 |
 | P3-44 | Content approver beyond super administrator | BUSINESS_DECISION_BLOCKED | Super administrator only | - | Decision | D24 |
 | P3-45 | CSV exports (enquiries, applications, newsletter) with role limits, formula-safe, row cap | IMPLEMENTED_AND_TESTED | `/admin/reports/*.csv` | test_csv_export_is_safe_and_audited, CSV cap test | - | - |
-| P3-46 | Reports: follow-up, document-review, communication | IMPLEMENTED_BUT_NOT_FULLY_VERIFIED | `/admin/reports/*` (earlier agent) | test_typed_aggregate_reports_and_role_scopes | Independent review | - |
+| P3-46 | Reports: follow-up, document-review, communication | IMPLEMENTED_AND_TESTED | `/admin/reports/*` (earlier agent) - independently reviewed 2026-11-10 | test_reports_exclude_strategic_follow_ups_for_bdm_and_deny_other_roles | - | - |
 | P3-47 | Audit: list, search, sort, actor names, strategic flag | IMPLEMENTED_AND_TESTED | `GET /admin/audit` | test_audit_rows_have_actor_names_strategic_flag_search_and_sort | - | - |
-| P3-48 | Audit detail, event catalogue and export | IMPLEMENTED_BUT_NOT_FULLY_VERIFIED | `/admin/audit/{id}`, `/audit/actions`, `/audit.csv` (earlier agent) | test_admin, test_gap_lists | Independent review | - |
+| P3-48 | Audit detail, event catalogue and export | IMPLEMENTED_AND_TESTED | `/admin/audit/{id}`, `/audit/actions`, `/audit.csv` (earlier agent) - independently reviewed 2026-11-10 | test_audit_detail_actions_and_csv_are_super_admin_only_and_safe | - | - |
 | P3-49 | Audit IP/device and before/after payloads | BUSINESS_DECISION_BLOCKED | Audit metadata avoids personal data by design | - | Privacy decision | D4 |
 | P3-50 | Settings (typed registry), security policy, launch readiness | IMPLEMENTED_AND_TESTED | `/admin/settings`, `/security-policy`, `/launch-readiness` | test_gap_reference (3) | - | - |
 | P3-51 | Privacy-request handling and deletion execution | IMPLEMENTED_AND_TESTED | `/admin/privacy-requests*` | test_privacy_deletion_execution, test_phase1_seo_privacy | Legal checks D4 | - |
@@ -153,7 +154,7 @@ Sources: PRD v2.0 s.8-14, 15 (B,C,E,H), 16-19, 21, 28; Frontend Backend Requests
 | ID | Requirement | Status | Implementation / endpoints | Tests | Remaining | Dependency |
 |---|---|---|---|---|---|---|
 | SH-01 | Pagination metadata on every paginated list | IMPLEMENTED_AND_TESTED | page, page_size, total, pages | test_every_paginated_list_reports_page_total_and_pages | - | - |
-| SH-02 | Typed request/response schemas | IMPLEMENTED_BUT_NOT_FULLY_VERIFIED | Most endpoints typed | OpenAPI | Untyped dicts remain only in places not individually reviewed | - |
+| SH-02 | Typed request/response schemas | IMPLEMENTED_AND_TESTED | Most endpoints typed - independently reviewed 2026-11-10 | OpenAPI check: no untyped dict responses remain | - | - |
 | SH-03 | OpenAPI regenerated | IMPLEMENTED_AND_TESTED | `docs/api/openapi.json` | generated from the app | - | - |
 | SH-04 | Rate limiting on public and sensitive actions | IMPLEMENTED_AND_TESTED | auth, invitation, submit buckets | test_invitation_actions_are_rate_limited | Per-process; edge limit external | - |
 | SH-05 | Private storage, no public file URLs | IMPLEMENTED_AND_TESTED | S3 adapter, signed server-side access only | test_no_public_download_route | Dashboard bucket-privacy check external | - |
@@ -169,11 +170,20 @@ Completion % = `IMPLEMENTED_AND_TESTED` / in-scope requirements (total minus `OU
 
 | Phase | Rows | In scope | Implemented and tested | Implemented, not fully verified | Not implemented | Business-decision blocked | External blocked | Out of scope | N/A | Completion % (tested) | Completion % (tested + unverified) |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Phase 1 - Public Website | 38 | 35 | 27 | 2 | 0 | 3 | 3 | 1 | 2 | 77.1% | 82.9% |
-| Phase 2 - Partner Portal | 37 | 36 | 25 | 1 | 0 | 10 | 0 | 1 | 0 | 69.4% | 72.2% |
-| Phase 3 - Admin Platform | 54 | 52 | 32 | 8 | 0 | 10 | 2 | 1 | 1 | 61.5% | 76.9% |
-| Shared requirements | 10 | 10 | 5 | 1 | 0 | 0 | 4 | 0 | 0 | 50.0% | 60.0% |
-| **All** | 139 | 133 | 89 | 12 | 0 | 23 | 9 | 3 | 3 | 66.9% | 75.9% |
+| Phase 1 - Public Website | 39 | 36 | 29 | 0 | 0 | 3 | 4 | 1 | 2 | 80.6% | 80.6% |
+| Phase 2 - Partner Portal | 37 | 36 | 26 | 0 | 0 | 10 | 0 | 1 | 0 | 72.2% | 72.2% |
+| Phase 3 - Admin Platform | 54 | 52 | 40 | 0 | 0 | 10 | 2 | 1 | 1 | 76.9% | 76.9% |
+| Shared requirements | 10 | 10 | 6 | 0 | 0 | 0 | 4 | 0 | 0 | 60.0% | 60.0% |
+| **All** | 140 | 134 | 101 | 0 | 0 | 23 | 10 | 3 | 3 | 75.4% | 75.4% |
 
 `NOT_IMPLEMENTED` rows: 0. Every unblocked requirement found is implemented; the remaining in-scope rows are blocked by a business decision or external configuration, or are implemented but need an independent review.
 
+
+## Review pass 2026-11-10
+All former `IMPLEMENTED_BUT_NOT_FULLY_VERIFIED` rows were re-read in source and covered by new negative/authorisation tests in `tests/api/test_review_inherited.py`; they are now `IMPLEMENTED_AND_TESTED` (the generated table above is authoritative). Turnstile was split: server-side validation (tested with a mocked Cloudflare) vs live verification (external). Unverified rows remaining: 0. Not implemented and unblocked: 0.
+
+### Decision-blocked rows (23): what was already built independent of the decision
+Eligibility: human evidence records, outcomes and audit exist; no thresholds or auto-decisions are coded (D5, D6, D9, D11). MFA: enrolment, verify, recovery, disable and session revocation exist; required/optional stays configuration (`STAFF_MFA_REQUIRED`) pending the owner (D28). Retention: metadata, expiry, purge job (dry-run) exist; periods stay unset (D4). Queue ownership: routing/backup/SLA/escalation settings exist; no default owners (D3). CMS: SEO, cover image URL, scheduling, approval exist; page structures and media hosting wait (D23, D29). Privacy: verification, tracking, staff handling, deletion executor exist; legal retention rules wait (D4). Onboarding: no generic structure was added because any task list, status or required-document rule would be an invented policy (D10). What each decision must state is in `../business-decisions-required.md`.
+
+### scripts/inspect_and_seed.py (reviewed, not run, not committed)
+Untracked file from another agent. It inserts one staff admin and one partner user into **whatever database `.env` points at (Supabase dev)**, with hard-coded default passwords (`Admin@2026`, `Partner@2026` unless env vars override), proceeds past the password-policy check, and only refuses when the target is production. It duplicates `scripts/create_staff_user.py` and fails ruff E402 (imports after `sys.path.insert`). It is excluded from Git via `.git/info/exclude`. Treat as unsafe: do not run it; delete or rewrite it to require an explicit local-only flag, prompted passwords and the policy check.

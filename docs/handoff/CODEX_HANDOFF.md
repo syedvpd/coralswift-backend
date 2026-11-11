@@ -1,5 +1,9 @@
 # Codex Handoff - Coral Swift Backend (written 2026-11-10)
 
+## Takeover completion update (2026-11-11)
+
+The user authorized migrations on the exact development Supabase project and explicitly said not to create a backup. Verified target: `zibfzlwzaecapfrgjret`; remote revision `0012` before, `0015` after (`0013`, `0014`, `0015` applied); schema catalog and `alembic check` are clean. Full local suite: 280 passed. Ruff, format, mypy, a fresh local disposable migration, and OpenAPI comparison passed. OpenAPI: 162 paths, 291 schemas. Live role accounts, frontend browser flow, production/admin/partner CORS host values, provider checks, and deployment were not performed. Current frontend integration facts are in `docs/frontend-backend-contract.md`; owner recommendations remain unapproved. This update supersedes historical status below where it conflicts.
+
 Source-verified on this date against Git `main` at `15ebe59` (equal to `origin/main`), working tree clean before this handoff was written. The three files in `docs/handoff/` are the only uncommitted changes. Nothing here is a claim of completion: see the matrices.
 
 **Current continuation state:** work since the original handoff remains uncommitted across application, tests and docs; migration `0012` is a local repository change only. The current progress matrix and end-of-section entries below supersede the historical baseline statements above.

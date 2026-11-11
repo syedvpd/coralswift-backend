@@ -14,6 +14,7 @@ PROD_INTEGRATIONS: dict[str, Any] = {
     "email_sender_address": "noreply@example.com",
     "captcha_enabled": True,
     "turnstile_secret_key": "secret",
+    "turnstile_allowed_hostnames": "coralswift.com",
 }
 
 
@@ -90,7 +91,9 @@ def test_valid_production_config_loads() -> None:
         ({"secret_key": "change-me-" + "x" * 40}, "SECRET_KEY"),
         ({"debug": True}, "DEBUG"),
         ({"cors_allowed_origins": "*"}, "CORS_ALLOWED_ORIGINS"),
+        ({"cors_allowed_origins": "https://*.vercel.app"}, "CORS_ALLOWED_ORIGINS"),
         ({"allowed_hosts": "*"}, "ALLOWED_HOSTS"),
+        ({"turnstile_allowed_hostnames": "*.vercel.app"}, "TURNSTILE_ALLOWED_HOSTNAMES"),
     ],
 )
 def test_insecure_production_config_rejected(overrides: dict[str, Any], fragment: str) -> None:
@@ -118,3 +121,14 @@ def test_non_postgres_url_rejected() -> None:
 def test_secrets_not_in_repr() -> None:
     s = make()
     assert GOOD_KEY not in repr(s) and "u:p@" not in repr(s)
+
+
+def test_turnstile_allowed_hostnames_parsed() -> None:
+    s = make(
+        turnstile_allowed_hostnames="coralswift.com, coralswift-ochre.vercel.app, localhost",
+    )
+    assert s.turnstile_allowed_hostnames == [
+        "coralswift.com",
+        "coralswift-ochre.vercel.app",
+        "localhost",
+    ]

@@ -228,14 +228,19 @@ def list_public(
     return ok([_pub(i) for i in items], meta=page_meta(page, total))
 
 
+class SitemapEntry(BaseModel):
+    slug: str
+    updated_at: datetime
+
+
 @public.get(
     "/sitemap",
-    response_model=ApiResponse[list[dict[str, Any]]],
+    response_model=ApiResponse[list[SitemapEntry]],
     summary="Slugs and last-modified times of published content (SEO)",
 )
-def sitemap(response: Response, db: DbSession) -> ApiResponse[list[dict[str, Any]]]:
+def sitemap(response: Response, db: DbSession) -> ApiResponse[list[SitemapEntry]]:
     _cache(response)
-    return ok([{"slug": s, "updated_at": u} for s, u in service.sitemap(db)])
+    return ok([SitemapEntry(slug=s, updated_at=u) for s, u in service.sitemap(db)])
 
 
 @public.get("/{slug}", response_model=ApiResponse[PublicContentDetail], responses=_ERR)

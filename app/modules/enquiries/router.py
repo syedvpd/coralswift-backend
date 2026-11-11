@@ -15,9 +15,11 @@ from app.modules.enquiries.submission import IdempotencyKeyHeader, execute_submi
 router = APIRouter(prefix="/enquiries", tags=["enquiries"])
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 _ERRORS: dict[int | str, dict[str, Any]] = {
+    403: {"model": ErrorResponse},
+    409: {"model": ErrorResponse},
+    413: {"model": ErrorResponse},
     422: {"model": ErrorResponse},
     429: {"model": ErrorResponse},
-    409: {"model": ErrorResponse},
 }
 
 

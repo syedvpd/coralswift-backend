@@ -1,5 +1,9 @@
 # PRD Phase 1 - Public Website (backend)
 
+## Verification update (2026-11-11)
+
+The full local suite passes (280 tests). Development migrations `0013`-`0015` are applied at Alembic head `0015`; see the audit and migration plan for evidence. Remaining Phase 1 gates are unresolved business inputs and external hosting/provider setup. Corporate/legal details and provider hostnames were not invented.
+
 Date 2026-11-10. Evidence: commit `15ebe59` (254 tests passed locally). Uncommitted work from another agent is present in the working tree and is **not verified** here. Item-level detail: `DEVELOPER_REQUEST_TO_PRD_MAPPING.md`, `../backend-gap-audit.md`.
 
 ## Delivered and tested
