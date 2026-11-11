@@ -1,6 +1,6 @@
 # Role permission matrix (generated from route guards)
 
-Generated from `endpoint_table(create_app())` on 2026-11-11. `allow` = role passes the route guard; `403` otherwise. Service-layer limits apply on top: reviewers reach only organisations/applications assigned to them; BDMs read partner collaboration data only for organisations explicitly assigned to them (`organization_bdm_assignments`, D45) and cannot write; strategic enquiries are super-administrator only; BDMs never see financial documents. `GET /auth/permissions` returns the live matrix; `tests/api/test_gap_phase_a.py::test_permission_matrix_matches_real_enforcement` checks it against enforcement for every parameter-free staff GET.
+Generated from `endpoint_table(create_app())`. `allow` = role passes the route guard; `403` otherwise. Service-layer limits apply on top: reviewers reach only organisations/applications assigned to them; BDMs read partner collaboration data only for organisations explicitly assigned to them and cannot write; strategic enquiries are super-administrator only; BDMs never see financial documents. `GET /auth/permissions` returns the live matrix; `test_permission_matrix_matches_real_enforcement` checks it against enforcement.
 
 Columns: SA super_administrator, BDM business_development_manager, PR partner_reviewer, CA content_administrator.
 

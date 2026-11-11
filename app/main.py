@@ -21,7 +21,9 @@ from app.database.session import build_engine, build_sessionmaker
 from app.health.router import router as health_router
 from app.integrations.botcheck import BotVerifier, build_bot_verifier
 from app.integrations.email import EmailSender, build_email_sender
+from app.integrations.scanner import ClamAVScanner, set_scanner
 from app.integrations.storage import Storage, build_storage
+from app.modules.documents.constants import set_scan_enforcement
 
 
 def create_app(
@@ -35,6 +37,16 @@ def create_app(
     settings = settings or load_settings()
     configure_logging(settings.log_level)
     engine = build_engine(settings)
+    if settings.scanner_backend == "clamav":
+        set_scanner(
+            ClamAVScanner(
+                settings.clamav_host, settings.clamav_port, settings.clamav_timeout_seconds
+            )
+        )
+        set_scan_enforcement(True)
+    else:
+        set_scanner(None)
+        set_scan_enforcement(False)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:

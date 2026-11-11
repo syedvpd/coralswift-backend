@@ -23,7 +23,7 @@ from app.modules.applications.service import partner_users
 from app.modules.content import service as content_service
 from app.modules.content.constants import ContentStatus
 from app.modules.content.models import ContentItem
-from app.modules.documents.constants import ATTACHABLE_STATUSES
+from app.modules.documents.constants import attachable_statuses
 from app.modules.enquiries.activity import log_activity
 from app.modules.enquiries.constants import ActorType, EnquiryStatus
 from app.modules.enquiries.models import Enquiry
@@ -47,7 +47,7 @@ def _expiring(db: Session, days: int) -> Sequence[Row[PartnerDocument, PartnerDo
         )
         .where(
             PartnerDocument.status == DocStatus.ACTIVE,
-            PartnerDocumentVersion.upload_status.in_(ATTACHABLE_STATUSES),
+            PartnerDocumentVersion.upload_status.in_(attachable_statuses()),
             PartnerDocumentVersion.expires_on.is_not(None),
             PartnerDocumentVersion.expires_on >= today,
             PartnerDocumentVersion.expires_on <= today + timedelta(days=days),

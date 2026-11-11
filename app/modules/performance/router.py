@@ -23,7 +23,7 @@ from app.modules.admin import settings_service as cfg
 from app.modules.applications.models import PortalApplication
 from app.modules.auth.dependencies import PartnerDep, ReviewerDep, StaffContext
 from app.modules.collaboration import service as collab
-from app.modules.documents.constants import ATTACHABLE_STATUSES
+from app.modules.documents.constants import attachable_statuses
 from app.modules.enquiries.activity import log_activity
 from app.modules.enquiries.constants import ActorType
 from app.modules.partner_documents.constants import DocStatus, ReviewStatus
@@ -360,7 +360,7 @@ def _completeness(db: Session, org: uuid.UUID) -> tuple[Decimal | None, str | No
                 PartnerDocument.organization_id == org,
                 PartnerDocument.status == DocStatus.ACTIVE,
                 PartnerDocumentVersion.review_status == ReviewStatus.ACCEPTED,
-                PartnerDocumentVersion.upload_status.in_(ATTACHABLE_STATUSES),
+                PartnerDocumentVersion.upload_status.in_(attachable_statuses()),
                 or_(
                     PartnerDocumentVersion.expires_on.is_(None),
                     PartnerDocumentVersion.expires_on >= utcnow().date(),

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.common.utilities import utcnow
 from app.core.config import Settings
 from app.core.exceptions import AppError
+from app.modules.admin import settings_service as cfg
 from app.modules.auth import mfa
 from app.modules.auth.constants import StaffRole, TokenPurpose, UserStatus, UserType
 from app.modules.auth.models import AuthSession, AuthToken, MfaRecoveryCode, User
@@ -177,6 +178,15 @@ def login(
     user = db.execute(
         select(User).where(User.email == email).with_for_update()
     ).scalar_one_or_none()
+    if user is not None and user.status is UserStatus.INVITED and user.password_hash is None:
+        # Frontend requirement P1.8: tell an invited person to activate. This confirms that a
+        # pending invitation exists for the address (accepted trade-off, rate limited).
+        burn_verify(settings, password)
+        raise AppError(
+            "This account has not been activated yet. Use the invitation link.",
+            status_code=403,
+            code="ACCOUNT_NOT_ACTIVATED",
+        )
     if user is None or user.password_hash is None or user.status is not UserStatus.ACTIVE:
         if (
             user is not None
@@ -203,8 +213,12 @@ def login(
     if not verify_password(settings, user.password_hash, password):
         user.failed_login_count += 1
         meta: dict[str, object] = {"failed_count": user.failed_login_count}
-        if user.failed_login_count >= settings.login_max_failures:
-            user.locked_until = now + timedelta(minutes=settings.login_lockout_minutes)
+        max_failures = cfg.get_int(db, "security.login_max_failures") or settings.login_max_failures
+        lock_minutes = (
+            cfg.get_int(db, "security.login_lockout_minutes") or settings.login_lockout_minutes
+        )
+        if user.failed_login_count >= max_failures:
+            user.locked_until = now + timedelta(minutes=lock_minutes)
             user.failed_login_count = 0
             meta["locked"] = True
         _audit(db, user, "auth.login_failed", meta)

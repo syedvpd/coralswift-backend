@@ -38,4 +38,32 @@ class UploadStatus(enum.StrEnum):
     FAILED = "failed"
 
 
-ATTACHABLE_STATUSES = (UploadStatus.QUARANTINED, UploadStatus.CLEAN)
+_state = {"enforce_clean": False}
+
+
+def set_scan_enforcement(on: bool) -> None:
+    """True when a scanner is configured: only `clean` files may be reviewed or downloaded."""
+    _state["enforce_clean"] = on
+
+
+def scan_enforced() -> bool:
+    return _state["enforce_clean"]
+
+
+def attachable_statuses() -> tuple[UploadStatus, ...]:
+    """Statuses that may be downloaded/reviewed/attached. Quarantine-only deployments (no
+    scanner, owner decision D33) allow quarantined files; with a scanner only `clean` passes."""
+    if _state["enforce_clean"]:
+        return (UploadStatus.CLEAN,)
+    return (UploadStatus.QUARANTINED, UploadStatus.CLEAN)
+
+
+def scan_status_of(status: str) -> str:
+    """not_scanned | scan_pending | clean | infected | scan_failed (clean only if scanned)."""
+    if status == UploadStatus.CLEAN.value:
+        return "clean"
+    if status == UploadStatus.REJECTED.value:
+        return "infected"
+    if status == UploadStatus.FAILED.value:
+        return "scan_failed"
+    return "scan_pending" if _state["enforce_clean"] else "not_scanned"

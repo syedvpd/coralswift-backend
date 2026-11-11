@@ -5,12 +5,13 @@ from typing import Literal
 
 from pydantic import BaseModel, computed_field
 
-ScanStatus = Literal["not_scanned", "clean", "infected", "scan_failed"]
+from app.modules.documents.constants import scan_status_of
+
+ScanStatus = Literal["not_scanned", "scan_pending", "clean", "infected", "scan_failed"]
 
 
 class ScanStatusMixin(BaseModel):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def scan_status(self) -> ScanStatus:
-        # shortcut: constant until a scanner exists; derive from a stored result then.
-        return "not_scanned"
+        return scan_status_of(str(getattr(self, "upload_status", "quarantined")))  # type: ignore[return-value]

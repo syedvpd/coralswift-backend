@@ -11,15 +11,16 @@ from app.core.config import Settings
 from app.core.exceptions import AppError
 from app.integrations.storage import Storage, StorageError
 from app.modules.documents.constants import (
-    ATTACHABLE_STATUSES,
     Classification,
     EvidenceCategory,
     OwnerType,
     UploadPurpose,
     UploadStatus,
+    attachable_statuses,
 )
 from app.modules.documents.files import validate_upload
 from app.modules.documents.models import Document
+from app.modules.documents.scanning import scan_upload
 from app.modules.enquiries.activity import log_activity
 
 logger = logging.getLogger("app.documents")
@@ -85,7 +86,7 @@ def upload_document(
         raise AppError(
             "File storage is unavailable", status_code=503, code="STORAGE_UNAVAILABLE"
         ) from None
-    doc.upload_status = UploadStatus.QUARANTINED  # no malware scanner configured yet
+    doc.upload_status = scan_upload(data)
     log_activity(db, "document", doc.id, "document.uploaded", {"purpose": purpose.value})
     db.commit()
     return doc
@@ -111,7 +112,7 @@ def attach_documents(
     valid = len(docs) == len(ids) and all(
         d.owner_type is OwnerType.UNATTACHED
         and d.purpose is purpose
-        and d.upload_status in ATTACHABLE_STATUSES
+        and d.upload_status in attachable_statuses()
         for d in docs
     )
     if not valid:  # one generic error: do not reveal which id exists or who owns it

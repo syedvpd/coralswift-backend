@@ -18,6 +18,7 @@ from app.modules.applications.models import (
 from app.modules.auth.constants import StaffRole, UserStatus, UserType
 from app.modules.auth.dependencies import StaffContext
 from app.modules.auth.models import User
+from app.modules.documents.constants import UploadStatus, scan_enforced
 from app.modules.enquiries.activity import log_activity
 from app.modules.enquiries.constants import ActorType
 from app.modules.notifications.constants import NotificationType, TemplateKey
@@ -227,6 +228,10 @@ def review_document(
     ).scalar_one_or_none()
     if version is None:
         raise NotFoundError("Document version not found")
+    if scan_enforced() and version.upload_status is not UploadStatus.CLEAN:
+        raise AppError(
+            "The file has not passed the malware scan", status_code=409, code="SCAN_REQUIRED"
+        )
     version.review_status = data.status
     version.review_comment = data.comment
     version.reviewed_by = staff.user.id

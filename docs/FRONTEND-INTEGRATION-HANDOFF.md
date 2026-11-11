@@ -42,3 +42,9 @@ Every document payload carries `scan_status`, always `not_scanned` today, and `u
 - **Onboarding template:** `GET/PUT /admin/onboarding-template`; `POST /reviewer/onboarding` accepts `use_template`.
 - **Bot token:** the public site obtains `X-Bot-Token` from the Cloudflare Turnstile widget in the browser (no backend endpoint). Protected endpoints answer 403 `BOT_CHECK_FAILED` without a valid token once `CAPTCHA_ENABLED=true`; today the Render service has it **false**, so the live check is not enforced.
 - **Limits:** 10 MiB per file; pdf, png, jpg, docx, xlsx (CMS images png/jpg); 12 MiB request body; max 10 documents per enquiry; 413 `FILE_TOO_LARGE`, 415 `UNSUPPORTED_FILE_TYPE`.
+
+## Final additions (scanner, errors, policy)
+- Login errors: 401 `INVALID_CREDENTIALS`; 403 `ACCOUNT_NOT_ACTIVATED` (invited, no password yet); 403 `ACCOUNT_DEACTIVATED` (suspended/deactivated, shown only after the correct password); 423 `ACCOUNT_LOCKED` (only after the correct password).
+- `scan_status` values: `not_scanned` (no scanner, quarantine-only), `scan_pending`, `clean`, `infected`, `scan_failed`. When the scanner is active only `clean` files can be downloaded or reviewed (404 on download, 409 `SCAN_REQUIRED` on review). Active today: NO (needs `SCANNER_BACKEND=clamav` and a clamd service).
+- Security policy write: `PUT /admin/settings/security.login_max_failures` (3-20) and `security.login_lockout_minutes` (1-1440), super administrator only.
+- Full status per original bullet: `docs/ACCEPTANCE-STATUS.md`.

@@ -15,8 +15,9 @@ from app.core.exceptions import AppError, NotFoundError
 from app.integrations.storage import Storage, StorageError
 from app.modules.admin import settings_service as cfg
 from app.modules.auth.dependencies import PartnerContext
-from app.modules.documents.constants import ATTACHABLE_STATUSES, UploadStatus
+from app.modules.documents.constants import UploadStatus, attachable_statuses
 from app.modules.documents.files import validate_upload
+from app.modules.documents.scanning import scan_upload
 from app.modules.enquiries.activity import log_activity
 from app.modules.enquiries.constants import ActorType
 from app.modules.partner_documents.constants import (
@@ -127,7 +128,7 @@ def _store_version(
         .with_for_update()
         .execution_options(populate_existing=True)
     ).scalar_one()
-    version.upload_status = UploadStatus.QUARANTINED  # no malware scanner configured
+    version.upload_status = scan_upload(data)
     locked.current_version_no = max(locked.current_version_no, version.version_no)
     log_activity(
         db,
@@ -238,7 +239,7 @@ def read_version(
             PartnerDocumentVersion.version_no == number,
         )
     ).scalar_one_or_none()
-    if version is None or version.upload_status not in ATTACHABLE_STATUSES:
+    if version is None or version.upload_status not in attachable_statuses():
         raise NotFoundError("Document version not found")
     try:
         data = storage.get(version.storage_key)
@@ -272,7 +273,7 @@ def missing_required_categories(db: Session, organization_id: uuid.UUID) -> list
         .where(
             PartnerDocument.organization_id == organization_id,
             PartnerDocument.status == DocStatus.ACTIVE,
-            PartnerDocumentVersion.upload_status.in_(ATTACHABLE_STATUSES),
+            PartnerDocumentVersion.upload_status.in_(attachable_statuses()),
             PartnerDocumentVersion.review_status.notin_(
                 [ReviewStatus.REJECTED, ReviewStatus.REPLACEMENT_REQUESTED]
             ),

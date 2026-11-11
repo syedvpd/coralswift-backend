@@ -111,6 +111,9 @@ REGISTRY: dict[str, Callable[[str], str]] = {
     **{f"route.backup.{q}": _uuid for q in QUEUES},  # out-of-office cover for the owner
     **{f"escalation.email.{q}": _email for q in QUEUES},  # told when a target is missed
     "ack_promise_enabled": _bool,  # s.28: acknowledgement wording may promise the SLA only if true
+    # Security policy (write): overrides the environment defaults at runtime, super admin only
+    "security.login_max_failures": _int(3, 20),
+    "security.login_lockout_minutes": _int(1, 1440),
     "retention.partner_document_days": _int(1, 3650),
     **{f"required_documents.{p.value}": _categories for p in EngagementPathway},
     "onboarding.template": _onboarding_template,

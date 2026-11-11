@@ -63,6 +63,10 @@ class Settings(BaseSettings):
 
     email_backend: Literal["console", "brevo"] = "console"
     brevo_api_key: SecretStr | None = None
+    scanner_backend: Literal["none", "clamav"] = "none"  # D33: none = quarantine-only
+    clamav_host: str = "localhost"
+    clamav_port: int = Field(default=3310, ge=1, le=65535)
+    clamav_timeout_seconds: float = Field(default=10.0, gt=0, le=120)
     enquiry_reply_enabled: bool = False  # D15: ad-hoc requester emails stay off until approved
     email_webhook_secret: SecretStr | None = None  # shared secret for provider event webhooks
     email_sender_address: str | None = None

@@ -3,7 +3,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel
 
-from app.modules.documents.constants import ATTACHABLE_STATUSES
+from app.modules.documents.constants import attachable_statuses
 from app.modules.documents.scan import ScanStatusMixin
 from app.modules.partner_documents.constants import PartnerDocCategory
 from app.modules.partner_documents.models import PartnerDocument, PartnerDocumentVersion
@@ -56,5 +56,5 @@ def document_out(d: PartnerDocument, v: PartnerDocumentVersion | None) -> Docume
         current_version=version_out(v) if v else None,
         can_replace=d.status.value == "active",
         can_remove=d.status.value == "active",
-        can_download=v is not None and v.upload_status in ATTACHABLE_STATUSES,
+        can_download=v is not None and v.upload_status in attachable_statuses(),
     )
