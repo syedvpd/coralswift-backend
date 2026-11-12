@@ -1,4 +1,4 @@
-"""Settings, templates, MFA reset, KPIs, profile change requests, partner extras, maintenance.
+"""Settings, templates, KPIs, profile change requests, partner extras, maintenance.
 Written during development; NOT executed yet."""
 
 from datetime import timedelta
@@ -137,19 +137,6 @@ def test_template_override_is_used_and_validated(
     email.sent.clear()
     client.post("/api/v1/enquiries/contact", json=factories.contact())
     assert "not an offer" in email.sent[0].text  # built-in restored
-
-
-def test_mfa_reset_by_super_admin(client: TestClient, db: Session, settings: Settings) -> None:
-    sa_user = make_staff(db, settings, StaffRole.SUPER_ADMINISTRATOR)
-    sa = staff_headers(client, sa_user)
-    other = make_staff(db, settings, StaffRole.PARTNER_REVIEWER)
-    other_h = staff_headers(client, other)
-    assert (
-        client.post(f"{ADM}/users/{sa_user.id}/mfa-reset", headers=sa).status_code == 409
-    )  # not your own
-    assert client.post(f"{ADM}/users/{other.id}/mfa-reset", headers=other_h).status_code == 403
-    assert client.post(f"{ADM}/users/{other.id}/mfa-reset", headers=sa).status_code == 200
-    assert client.get("/api/v1/auth/me", headers=other_h).status_code == 401  # sessions revoked
 
 
 def test_kpis(client: TestClient, db: Session, settings: Settings, email: RecordingEmail) -> None:

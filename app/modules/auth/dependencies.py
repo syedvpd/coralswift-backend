@@ -6,13 +6,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.common.utilities import utcnow
-from app.core.config import Settings
 from app.core.exceptions import AppError
 from app.database.dependencies import DbSession
 from app.modules.auth.constants import StaffRole, UserStatus, UserType
@@ -63,11 +62,11 @@ class StaffContext:
         return self.user.staff_role is StaffRole.SUPER_ADMINISTRATOR
 
 
-def get_auth_pending_mfa(
+def get_auth(
     db: DbSession,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
 ) -> AuthContext:
-    """Valid session, second factor not required yet. Only MFA, /me and logout use this."""
+    """Valid, unexpired session of an active account."""
     if credentials is None or not credentials.credentials:
         raise unauthenticated()
     row = db.execute(
@@ -85,25 +84,6 @@ def get_auth_pending_mfa(
     ):
         raise unauthenticated()
     return AuthContext(user=user, session=session)
-
-
-PendingAuthDep = Annotated[AuthContext, Depends(get_auth_pending_mfa)]
-
-
-def get_auth(request: Request, auth: PendingAuthDep) -> AuthContext:
-    """Fully authenticated: the second factor is verified when MFA is enabled or mandatory."""
-    settings: Settings = request.app.state.settings
-    user = auth.user
-    if user.mfa_enabled_at is not None:
-        if auth.session.mfa_verified_at is None:
-            raise AppError("MFA verification required", status_code=401, code="MFA_REQUIRED")
-    elif user.user_type is UserType.STAFF and settings.staff_mfa_required:
-        raise AppError(
-            "MFA enrollment required for staff accounts",
-            status_code=403,
-            code="MFA_ENROLLMENT_REQUIRED",
-        )
-    return auth
 
 
 AuthDep = Annotated[AuthContext, Depends(get_auth)]

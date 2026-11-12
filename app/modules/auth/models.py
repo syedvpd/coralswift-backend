@@ -33,7 +33,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     failed_login_count: Mapped[int] = mapped_column(SmallInteger, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # TOTP MFA (encrypted secret; see auth/mfa.py)
+    # Legacy MFA columns/table: unused since MFA was removed; kept so no data is dropped
     mfa_secret_enc: Mapped[str | None] = mapped_column(String(255))
     mfa_enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     mfa_last_step: Mapped[int | None] = mapped_column(BigInteger)

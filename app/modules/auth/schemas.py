@@ -25,9 +25,6 @@ class TokenOut(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     expires_in: int
-    # Staff must finish MFA before protected routes work (see /auth/mfa/*).
-    mfa_required: bool = False
-    mfa_enrollment_required: bool = False
 
 
 class AcceptInvitationIn(BaseModel):
@@ -73,8 +70,6 @@ class MeOut(BaseModel):
     partner_role: str | None = None  # owner | member (partner accounts)
     permissions: list[str] = Field(default_factory=list)  # partner permissions, e.g. team.manage
     organization: OrganizationRef | None = None
-    mfa_enabled: bool = False
-    mfa_required: bool = False  # staff: enforced by deployment policy; partners: optional
     last_login_at: datetime | None = None
 
 
@@ -95,13 +90,6 @@ class ProfileUpdateIn(BaseModel):
         return self
 
 
-class MfaDisableIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    password: str = Field(min_length=1, max_length=256)
-    code: str = Field(min_length=6, max_length=6, pattern=r"^[0-9]{6}$")
-
-
 class SessionOut(BaseModel):
     id: uuid.UUID
     created_at: datetime
@@ -109,25 +97,3 @@ class SessionOut(BaseModel):
     user_agent: str | None
     current: bool
     expires_at: datetime | None = None  # when the refresh token stops working
-
-
-class MfaEnrollOut(BaseModel):
-    secret: str = Field(description="Base32 secret for authenticator apps; shown once")
-    otpauth_uri: str
-
-
-class MfaCodeIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    code: str = Field(min_length=6, max_length=6, pattern=r"^[0-9]{6}$")
-
-
-class MfaVerifyIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    code: str | None = Field(default=None, pattern=r"^[0-9]{6}$")
-    recovery_code: str | None = Field(default=None, min_length=10, max_length=10)
-
-
-class RecoveryCodesOut(BaseModel):
-    recovery_codes: list[str] = Field(description="Single-use; shown once. Store them safely.")

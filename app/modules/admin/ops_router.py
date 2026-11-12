@@ -1,4 +1,4 @@
-"""Super-administrator operations: system settings, email templates, MFA reset, KPI report
+"""Super-administrator operations: system settings, email templates, KPI report
 (PRD s.14 "notification templates and system settings", s.19, s.20)."""
 
 import uuid
@@ -7,7 +7,7 @@ from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import case, exists, func, literal_column, select, update
+from sqlalchemy import case, exists, func, literal_column, select
 from sqlalchemy.orm import Session
 
 from app.common.pagination import PageDep, page_meta
@@ -34,10 +34,9 @@ from app.modules.admin.schemas import (
 )
 from app.modules.applications.constants import PortalStatus
 from app.modules.applications.models import EligibilityVerification, PortalApplication
-from app.modules.auth import service as auth_service
 from app.modules.auth.constants import StaffRole, UserStatus, UserType
 from app.modules.auth.dependencies import StaffContext, SuperAdminDep, require_staff
-from app.modules.auth.models import MfaRecoveryCode, User
+from app.modules.auth.models import User
 from app.modules.engagement.models import MeetingRequest
 from app.modules.enquiries.activity import log_activity
 from app.modules.enquiries.constants import ActorType, EnquiryStatus
@@ -473,33 +472,6 @@ def preview_template(
         payload.subject, payload.text_body, payload.html_body, sample
     )
     return ok({"subject": subject, "text": text, "html": html})
-
-
-# ----------------------------------------------------------------- MFA reset
-@router.post(
-    "/users/{user_id}/mfa-reset",
-    response_model=ApiResponse[None],
-    responses=_ERR,
-    summary="Clear a staff member's MFA after a lost device (they must re-enroll)",
-)
-def mfa_reset(user_id: uuid.UUID, staff: SuperAdminDep, db: DbSession) -> ApiResponse[None]:
-    if user_id == staff.user.id:
-        raise AppError("You cannot reset your own MFA", status_code=409, code="SELF_CHANGE")
-    user = db.execute(select(User).where(User.id == user_id).with_for_update()).scalar_one_or_none()
-    if user is None:
-        raise NotFoundError("User not found")
-    user.mfa_secret_enc, user.mfa_enabled_at, user.mfa_last_step = None, None, None
-    db.execute(
-        update(MfaRecoveryCode)
-        .where(MfaRecoveryCode.user_id == user.id, MfaRecoveryCode.used_at.is_(None))
-        .values(used_at=utcnow())
-    )
-    auth_service.revoke_all_sessions(db, user.id, "mfa_reset")
-    log_activity(
-        db, "user", user.id, "admin.mfa_reset", None, ActorType.STAFF, actor_user_id=staff.user.id
-    )
-    db.commit()
-    return ok(None, "MFA cleared")
 
 
 # ----------------------------------------------------------------------- KPIs

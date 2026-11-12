@@ -54,3 +54,6 @@ Every document payload carries `scan_status`, always `not_scanned` today, and `u
 - Escalation: still no first response 48 h after creation -> one escalation notification (setting `sla_escalation.<queue>` overrides 48 h). First-response target stays 24 h (`sla.<queue>`).
 - Security policy settings (super admin, `PUT /admin/settings/{key}`): `security.login_max_failures` 3-20, `security.login_lockout_minutes` 1-1440, `security.password_min_length` 8-128, `security.access_token_minutes` 5-1440, `security.refresh_token_minutes` 60-43200, `security.invitation_ttl_hours` 1-720, `security.reset_ttl_minutes` 5-1440.
 - Refused document downloads (403/404/409) are audited as `document.download_denied` (outcome `failure`, no file or owner data).
+
+## MFA removed
+MFA no longer exists. Sign-in is email + password only: `POST /auth/login` returns tokens that work immediately. Removed: `POST /auth/mfa/{enroll,confirm,verify,disable,recovery-codes}`, `POST /admin/users/{id}/mfa-reset`, `mfa_required` / `mfa_enrollment_required` on the login response, `mfa_enabled` / `mfa_required` on `/auth/me` and staff rows, `staff_mfa_required` / `partner_mfa` on `/admin/security-policy`, and the error codes `MFA_REQUIRED`, `MFA_ENROLLMENT_REQUIRED`, `INVALID_MFA_CODE`. Superseded: every earlier mention of MFA in this repository's docs.

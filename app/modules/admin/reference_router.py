@@ -235,8 +235,6 @@ class SecurityPolicyOut(BaseModel):
 
     password_min_length: int
     password_rules: str
-    staff_mfa_required: bool
-    partner_mfa: Literal["optional"]
     login_max_failures: int
     login_lockout_minutes: int
     access_token_minutes: int
@@ -258,7 +256,7 @@ class SecurityPolicyOut(BaseModel):
     "/security-policy",
     response_model=ApiResponse[SecurityPolicyOut],
     responses=_ERR,
-    summary="Effective password, session, MFA, rate-limit and upload policy (read-only)",
+    summary="Effective password, session, rate-limit and upload policy (read-only)",
 )
 def security_policy(staff: SuperAdminDep, settings: SettingsDep) -> ApiResponse[SecurityPolicyOut]:
     return ok(
@@ -268,8 +266,6 @@ def security_policy(staff: SuperAdminDep, settings: SettingsDep) -> ApiResponse[
                 f"{settings.password_min_length}-{MAX_PASSWORD_LENGTH} characters; "
                 "must not equal the email address"
             ),
-            staff_mfa_required=settings.staff_mfa_required,
-            partner_mfa="optional",
             login_max_failures=settings.login_max_failures,
             login_lockout_minutes=settings.login_lockout_minutes,
             access_token_minutes=settings.access_token_expire_minutes,

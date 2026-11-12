@@ -331,7 +331,6 @@ def _staff_out(u: User) -> StaffOut:
         full_name=u.full_name,
         staff_role=u.staff_role,
         status=u.status.value,
-        mfa_enabled=u.mfa_enabled_at is not None,
         last_login_at=u.last_login_at,
         created_at=u.created_at,
         updated_at=u.updated_at,
@@ -366,7 +365,7 @@ def list_staff(
     status_code=201,
     response_model=ApiResponse[StaffOut],
     responses=_ERR,
-    summary="Invite a staff user (they set a password, then enroll MFA)",
+    summary="Invite a staff user (they set a password)",
 )
 def invite_staff(
     payload: StaffInviteIn,

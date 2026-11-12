@@ -1,5 +1,5 @@
 """PRD s.28 acceptance-level requirements: claims register, SLA/routing/escalation, failure
-visibility, launch gate, catalog safeguards, privacy deletion, MFA recovery."""
+visibility, launch gate, catalog safeguards, privacy deletion."""
 
 from datetime import timedelta
 
@@ -11,16 +11,14 @@ from sqlalchemy.orm import Session
 from app.common.utilities import utcnow
 from app.core.config import Settings
 from app.modules.admin import maintenance
-from app.modules.auth import mfa
 from app.modules.auth.constants import StaffRole, UserStatus
 from app.modules.auth.models import User
 from app.modules.enquiries.models import Contact, Enquiry
 from app.modules.notifications.models import Notification
 from app.modules.notifications.service import dispatch_notifications
 from tests import factories
-from tests.conftest import AppFactory
 from tests.fakes import RecordingEmail
-from tests.helpers import bearer, last_token, login, make_staff, staff_headers
+from tests.helpers import last_token, make_staff, staff_headers
 
 ADM = "/api/v1/admin"
 AC = "/api/v1/admin/content"
@@ -264,36 +262,3 @@ def test_privacy_deletion_execution(
         client.post(f"{ADM}/privacy-requests/{req['id']}/execute", headers=sa).status_code == 409
     )  # only once
     assert "forget.me@example.com" not in client.get(f"{ADM}/privacy-requests", headers=sa).text
-
-
-def test_mfa_recovery_codes_regeneration(app_factory: AppFactory, settings: Settings) -> None:
-    app = app_factory(staff_mfa_required=True)
-    with TestClient(app, raise_server_exceptions=False) as client:
-        db: Session = app.state.sessionmaker()
-        user = make_staff(db, settings, StaffRole.PARTNER_REVIEWER)
-        h = bearer(login(client, user.email)["access_token"])
-        secret = client.post("/api/v1/auth/mfa/enroll", headers=h).json()["data"]["secret"]
-        old = client.post(
-            "/api/v1/auth/mfa/confirm",
-            headers=h,
-            json={"code": mfa.code_at(secret, mfa.current_step())},
-        ).json()["data"]["recovery_codes"]
-        url = "/api/v1/auth/mfa/recovery-codes"
-        assert client.post(url, headers=h, json={"code": "000000"}).status_code == 401
-        new = client.post(
-            url, headers=h, json={"code": mfa.code_at(secret, mfa.current_step() + 1)}
-        ).json()["data"]["recovery_codes"]
-        assert len(new) == 8 and not set(new) & set(old)
-        h2 = bearer(login(client, user.email)["access_token"])
-        assert (
-            client.post(
-                "/api/v1/auth/mfa/verify", headers=h2, json={"recovery_code": old[0]}
-            ).status_code
-            == 401
-        )  # retired
-        assert (
-            client.post(
-                "/api/v1/auth/mfa/verify", headers=h2, json={"recovery_code": new[0]}
-            ).status_code
-            == 200
-        )

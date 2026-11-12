@@ -7,7 +7,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import timedelta
 
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -15,9 +15,8 @@ from app.common.utilities import utcnow
 from app.core.config import Settings
 from app.core.exceptions import AppError
 from app.modules.admin import settings_service as cfg
-from app.modules.auth import mfa
 from app.modules.auth.constants import StaffRole, TokenPurpose, UserStatus, UserType
-from app.modules.auth.models import AuthSession, AuthToken, MfaRecoveryCode, User
+from app.modules.auth.models import AuthSession, AuthToken, User
 from app.modules.auth.policy import effective_settings
 from app.modules.auth.security import (
     burn_verify,
@@ -96,37 +95,6 @@ def update_profile(db: Session, user_id: uuid.UUID, changes: dict[str, str | Non
         _audit(db, user, "auth.profile_updated", {"fields": changed})
         db.commit()
     return user
-
-
-def disable_mfa(db: Session, settings: Settings, user: User, password: str, code: str) -> None:
-    """Partner accounts only (staff MFA is mandatory policy). Needs the password and a live code;
-    every other session is signed out afterwards."""
-    locked = db.execute(select(User).where(User.id == user.id).with_for_update()).scalar_one()
-    if locked.user_type is not UserType.PARTNER:
-        raise AppError(
-            "Staff MFA cannot be disabled", status_code=403, code="MFA_REQUIRED_FOR_STAFF"
-        )
-    if locked.mfa_enabled_at is None or locked.mfa_secret_enc is None:
-        raise AppError("MFA is not enabled", status_code=409, code="MFA_NOT_ENABLED")
-    if locked.password_hash is None or not verify_password(
-        settings, locked.password_hash, password
-    ):
-        _audit(db, locked, "auth.mfa_disable_failed")
-        db.commit()
-        raise AppError(
-            "Current password is incorrect", status_code=400, code="INVALID_CURRENT_PASSWORD"
-        )
-    secret = mfa.decrypt_secret(settings, locked.mfa_secret_enc)
-    if not secret or mfa.verify_code(secret, code, locked.mfa_last_step) is None:
-        _audit(db, locked, "auth.mfa_disable_failed")
-        db.commit()
-        raise AppError("Invalid verification code", status_code=401, code="INVALID_MFA_CODE")
-    locked.mfa_secret_enc = None
-    locked.mfa_enabled_at = None
-    locked.mfa_last_step = None
-    db.execute(delete(MfaRecoveryCode).where(MfaRecoveryCode.user_id == locked.id))
-    _audit(db, locked, "auth.mfa_disabled")
-    db.commit()
 
 
 def revoke_other_sessions(db: Session, user: User, current: AuthSession) -> int:
@@ -531,101 +499,6 @@ def create_staff_user(
     return user
 
 
-# ------------------------------------------------------------------------ MFA
-def _mfa_fail(db: Session, settings: Settings, user: User) -> AppError:
-    """Wrong MFA code: counts towards the same lockout as passwords."""
-    user.failed_login_count += 1
-    meta: dict[str, object] = {"failed_count": user.failed_login_count}
-    if user.failed_login_count >= settings.login_max_failures:
-        user.locked_until = utcnow() + timedelta(minutes=settings.login_lockout_minutes)
-        user.failed_login_count = 0
-        revoke_all_sessions(db, user.id, "mfa_lockout")
-        meta["locked"] = True
-    _audit(db, user, "auth.mfa_failed", meta)
-    db.commit()
-    return AppError("Invalid verification code", status_code=401, code="INVALID_MFA_CODE")
-
-
-def begin_mfa_enrollment(db: Session, settings: Settings, user: User) -> tuple[str, str]:
-    """Create (or replace, while not yet confirmed) the secret. Returns (secret, otpauth URI)."""
-    locked = db.execute(select(User).where(User.id == user.id).with_for_update()).scalar_one()
-    if locked.mfa_enabled_at is not None:
-        raise AppError("MFA is already enabled", status_code=409, code="MFA_ALREADY_ENABLED")
-    secret = mfa.new_secret()
-    locked.mfa_secret_enc = mfa.encrypt_secret(settings, secret)
-    locked.mfa_last_step = None
-    _audit(db, locked, "auth.mfa_enrollment_started")
-    db.commit()
-    return secret, mfa.provisioning_uri(settings, locked.email, secret)
-
-
-def confirm_mfa_enrollment(
-    db: Session, settings: Settings, user: User, session: AuthSession, code: str
-) -> list[str]:
-    """Verify the first code, enable MFA, verify this session, return recovery codes once."""
-    locked = db.execute(select(User).where(User.id == user.id).with_for_update()).scalar_one()
-    if locked.mfa_enabled_at is not None or not locked.mfa_secret_enc:
-        raise AppError("Start MFA enrollment first", status_code=409, code="MFA_NOT_PENDING")
-    secret = mfa.decrypt_secret(settings, locked.mfa_secret_enc)
-    step = mfa.verify_code(secret, code, locked.mfa_last_step) if secret else None
-    if step is None:
-        raise _mfa_fail(db, settings, locked)
-    now = utcnow()
-    locked.mfa_enabled_at = now
-    locked.mfa_last_step = step
-    locked.failed_login_count = 0
-    db.execute(update(AuthSession).where(AuthSession.id == session.id).values(mfa_verified_at=now))
-    codes = mfa.new_recovery_codes()
-    for c in codes:
-        db.add(MfaRecoveryCode(user_id=locked.id, code_hash=mfa.hash_recovery_code(c)))
-    _audit(db, locked, "auth.mfa_enabled")
-    db.commit()
-    return codes
-
-
-def verify_mfa(
-    db: Session,
-    settings: Settings,
-    user: User,
-    session: AuthSession,
-    *,
-    code: str | None,
-    recovery_code: str | None,
-) -> None:
-    """Complete the second factor for this session using a TOTP code or a one-time recovery code."""
-    locked = db.execute(select(User).where(User.id == user.id).with_for_update()).scalar_one()
-    if locked.mfa_enabled_at is None or not locked.mfa_secret_enc:
-        raise AppError("MFA is not enabled", status_code=409, code="MFA_NOT_ENABLED")
-    now = utcnow()
-    if locked.locked_until and locked.locked_until > now:
-        raise AppError("Invalid verification code", status_code=401, code="INVALID_MFA_CODE")
-    ok = False
-    if recovery_code:
-        used = db.execute(
-            update(MfaRecoveryCode)
-            .where(
-                MfaRecoveryCode.user_id == locked.id,
-                MfaRecoveryCode.code_hash == mfa.hash_recovery_code(recovery_code),
-                MfaRecoveryCode.used_at.is_(None),
-            )
-            .values(used_at=now)
-            .returning(MfaRecoveryCode.id)
-        ).first()
-        ok = used is not None
-    elif code:
-        secret = mfa.decrypt_secret(settings, locked.mfa_secret_enc)
-        step = mfa.verify_code(secret, code, locked.mfa_last_step) if secret else None
-        if step is not None:
-            locked.mfa_last_step = step
-            ok = True
-    if not ok:
-        raise _mfa_fail(db, settings, locked)
-    locked.failed_login_count = 0
-    db.execute(update(AuthSession).where(AuthSession.id == session.id).values(mfa_verified_at=now))
-    _audit(db, locked, "auth.mfa_verified", {"recovery": bool(recovery_code)})
-    db.commit()
-
-
 def invite_staff_user(
     db: Session,
     settings: Settings,
@@ -635,8 +508,7 @@ def invite_staff_user(
     full_name: str,
     role: StaffRole,
 ) -> User:
-    """Super administrator creates a pending staff account; the invitee sets a password, then must
-    enroll MFA at first login. Caller commits."""
+    """Super administrator creates a pending staff account; the invitee sets a password."""
     settings = effective_settings(db, settings)
     email = email.strip().lower()
     if db.execute(select(User).where(User.email == email)).scalar_one_or_none() is not None:
@@ -673,29 +545,6 @@ def invite_staff_user(
         actor_user_id=inviter.id,
     )
     return user
-
-
-def regenerate_recovery_codes(db: Session, settings: Settings, user: User, code: str) -> list[str]:
-    """Replace all recovery codes after proving possession of the authenticator (safe recovery)."""
-    locked = db.execute(select(User).where(User.id == user.id).with_for_update()).scalar_one()
-    if locked.mfa_enabled_at is None or not locked.mfa_secret_enc:
-        raise AppError("MFA is not enabled", status_code=409, code="MFA_NOT_ENABLED")
-    secret = mfa.decrypt_secret(settings, locked.mfa_secret_enc)
-    step = mfa.verify_code(secret, code, locked.mfa_last_step) if secret else None
-    if step is None:
-        raise _mfa_fail(db, settings, locked)
-    locked.mfa_last_step = step
-    db.execute(
-        update(MfaRecoveryCode)
-        .where(MfaRecoveryCode.user_id == locked.id, MfaRecoveryCode.used_at.is_(None))
-        .values(used_at=utcnow())
-    )
-    codes = mfa.new_recovery_codes()
-    for c in codes:
-        db.add(MfaRecoveryCode(user_id=locked.id, code_hash=mfa.hash_recovery_code(c)))
-    _audit(db, locked, "auth.mfa_recovery_codes_regenerated")
-    db.commit()
-    return codes
 
 
 # ------------------------------------------------------------ password change

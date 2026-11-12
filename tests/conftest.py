@@ -46,7 +46,6 @@ def settings() -> Settings:
         rate_limit_per_minute=1000,
         password_time_cost=1,
         password_memory_kib=8,  # test-speed Argon2 parameters only
-        staff_mfa_required=False,  # MFA tests turn this on explicitly
         login_max_failures=3,
         login_lockout_minutes=15,
         notify_general_emails=["ops-general@example.test"],

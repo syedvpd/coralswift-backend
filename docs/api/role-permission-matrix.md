@@ -113,7 +113,6 @@ Columns: SA super_administrator, BDM business_development_manager, PR partner_re
 | POST | `/api/v1/admin/users/{user_id}/activate` | allow | 403 | 403 | 403 |
 | GET | `/api/v1/admin/users/{user_id}/activity` | allow | 403 | 403 | 403 |
 | POST | `/api/v1/admin/users/{user_id}/deactivate` | allow | 403 | 403 | 403 |
-| POST | `/api/v1/admin/users/{user_id}/mfa-reset` | allow | 403 | 403 | 403 |
 | POST | `/api/v1/admin/users/{user_id}/role` | allow | 403 | 403 | 403 |
 | GET | `/api/v1/admin/workload` | allow | allow | 403 | 403 |
 | GET | `/api/v1/reviewer/applications` | allow | 403 | allow | 403 |
@@ -186,11 +185,6 @@ Columns: SA super_administrator, BDM business_development_manager, PR partner_re
 | POST | `/api/v1/auth/logout` | authenticated |
 | GET | `/api/v1/auth/me` | authenticated |
 | PATCH | `/api/v1/auth/me` | authenticated |
-| POST | `/api/v1/auth/mfa/confirm` | authenticated |
-| POST | `/api/v1/auth/mfa/disable` | authenticated |
-| POST | `/api/v1/auth/mfa/enroll` | authenticated |
-| POST | `/api/v1/auth/mfa/recovery-codes` | authenticated |
-| POST | `/api/v1/auth/mfa/verify` | authenticated |
 | GET | `/api/v1/auth/permissions` | authenticated |
 | DELETE | `/api/v1/auth/sessions` | authenticated |
 | GET | `/api/v1/auth/sessions` | authenticated |

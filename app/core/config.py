@@ -90,9 +90,6 @@ class Settings(BaseSettings):
     password_time_cost: int = Field(default=2, ge=1)  # Argon2id (OWASP minimum profile)
     password_memory_kib: int = Field(default=19456, ge=8)
     login_max_failures: int = Field(default=5, ge=1)
-    # PRD s.13/s.19: MFA for reviewers/administrators. Staff sessions stay limited until verified.
-    staff_mfa_required: bool = True
-    mfa_issuer: str = "CoralSwift"
     login_lockout_minutes: int = Field(default=15, ge=1)
     invitation_ttl_hours: int = Field(default=168, ge=1)
     password_reset_ttl_minutes: int = Field(default=60, ge=1)
@@ -160,8 +157,6 @@ class Settings(BaseSettings):
             problems.append(
                 "production needs EMAIL_BACKEND=brevo, BREVO_API_KEY, EMAIL_SENDER_ADDRESS"
             )
-        if not self.staff_mfa_required:
-            problems.append("STAFF_MFA_REQUIRED must be true")
         if problems:
             raise ValueError(f"Invalid {self.app_env} configuration: " + "; ".join(problems))
         return self

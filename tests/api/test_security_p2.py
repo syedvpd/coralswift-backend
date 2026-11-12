@@ -36,7 +36,6 @@ def test_every_protected_route_rejects_anonymous_requests(client: TestClient) ->
                 "/api/v1/auth/me",
                 "/api/v1/auth/sessions",
                 "/api/v1/auth/logout",
-                "/api/v1/auth/mfa",
             )
         ):
             continue

@@ -119,7 +119,7 @@ def test_security_policy_is_read_only_super_admin_only_and_has_no_secrets(
     assert body.status_code == 200
     p = body.json()["data"]
     assert p["password_min_length"] == settings.password_min_length
-    assert p["max_upload_bytes"] == settings.max_upload_bytes and p["partner_mfa"] == "optional"
+    assert p["max_upload_bytes"] == settings.max_upload_bytes
     assert {"pdf", "png", "docx"} <= set(p["allowed_upload_types"])
     assert p["invitation_link_path"] == "/activate?token="
     assert p["reset_link_path"] == "/reset-password?token="

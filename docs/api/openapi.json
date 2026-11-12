@@ -89,10 +89,6 @@
       ],
       "title": "Last Login At"
      },
-     "mfa_enabled": {
-      "title": "Mfa Enabled",
-      "type": "boolean"
-     },
      "organization": {
       "anyOf": [
        {
@@ -140,7 +136,6 @@
      "staff_role",
      "status",
      "invitation_state",
-     "mfa_enabled",
      "last_login_at",
      "created_at",
      "updated_at",
@@ -292,10 +287,6 @@
       ],
       "title": "Last Login At"
      },
-     "mfa_enabled": {
-      "title": "Mfa Enabled",
-      "type": "boolean"
-     },
      "organization": {
       "anyOf": [
        {
@@ -336,7 +327,6 @@
      "staff_role",
      "status",
      "invitation_state",
-     "mfa_enabled",
      "last_login_at",
      "created_at",
      "updated_at"
@@ -1750,44 +1740,6 @@
     "title": "ApiResponse[MediaOut]",
     "type": "object"
    },
-   "ApiResponse_MfaEnrollOut_": {
-    "properties": {
-     "data": {
-      "anyOf": [
-       {
-        "$ref": "#/components/schemas/MfaEnrollOut"
-       },
-       {
-        "type": "null"
-       }
-      ]
-     },
-     "message": {
-      "default": "Operation completed successfully",
-      "title": "Message",
-      "type": "string"
-     },
-     "meta": {
-      "anyOf": [
-       {
-        "additionalProperties": true,
-        "type": "object"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Meta"
-     },
-     "success": {
-      "default": true,
-      "title": "Success",
-      "type": "boolean"
-     }
-    },
-    "title": "ApiResponse[MfaEnrollOut]",
-    "type": "object"
-   },
    "ApiResponse_MilestoneOut_": {
     "properties": {
      "data": {
@@ -2502,44 +2454,6 @@
      }
     },
     "title": "ApiResponse[ReadinessOut]",
-    "type": "object"
-   },
-   "ApiResponse_RecoveryCodesOut_": {
-    "properties": {
-     "data": {
-      "anyOf": [
-       {
-        "$ref": "#/components/schemas/RecoveryCodesOut"
-       },
-       {
-        "type": "null"
-       }
-      ]
-     },
-     "message": {
-      "default": "Operation completed successfully",
-      "title": "Message",
-      "type": "string"
-     },
-     "meta": {
-      "anyOf": [
-       {
-        "additionalProperties": true,
-        "type": "object"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Meta"
-     },
-     "success": {
-      "default": true,
-      "title": "Success",
-      "type": "boolean"
-     }
-    },
-    "title": "ApiResponse[RecoveryCodesOut]",
     "type": "object"
    },
    "ApiResponse_ReplyOut_": {
@@ -11630,16 +11544,6 @@
       ],
       "title": "Last Login At"
      },
-     "mfa_enabled": {
-      "default": false,
-      "title": "Mfa Enabled",
-      "type": "boolean"
-     },
-     "mfa_required": {
-      "default": false,
-      "title": "Mfa Required",
-      "type": "boolean"
-     },
      "organization": {
       "anyOf": [
        {
@@ -11969,98 +11873,6 @@
     ],
     "title": "MessageDirection",
     "type": "string"
-   },
-   "MfaCodeIn": {
-    "additionalProperties": false,
-    "properties": {
-     "code": {
-      "maxLength": 6,
-      "minLength": 6,
-      "pattern": "^[0-9]{6}$",
-      "title": "Code",
-      "type": "string"
-     }
-    },
-    "required": [
-     "code"
-    ],
-    "title": "MfaCodeIn",
-    "type": "object"
-   },
-   "MfaDisableIn": {
-    "additionalProperties": false,
-    "properties": {
-     "code": {
-      "maxLength": 6,
-      "minLength": 6,
-      "pattern": "^[0-9]{6}$",
-      "title": "Code",
-      "type": "string"
-     },
-     "password": {
-      "maxLength": 256,
-      "minLength": 1,
-      "title": "Password",
-      "type": "string"
-     }
-    },
-    "required": [
-     "password",
-     "code"
-    ],
-    "title": "MfaDisableIn",
-    "type": "object"
-   },
-   "MfaEnrollOut": {
-    "properties": {
-     "otpauth_uri": {
-      "title": "Otpauth Uri",
-      "type": "string"
-     },
-     "secret": {
-      "description": "Base32 secret for authenticator apps; shown once",
-      "title": "Secret",
-      "type": "string"
-     }
-    },
-    "required": [
-     "secret",
-     "otpauth_uri"
-    ],
-    "title": "MfaEnrollOut",
-    "type": "object"
-   },
-   "MfaVerifyIn": {
-    "additionalProperties": false,
-    "properties": {
-     "code": {
-      "anyOf": [
-       {
-        "pattern": "^[0-9]{6}$",
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Code"
-     },
-     "recovery_code": {
-      "anyOf": [
-       {
-        "maxLength": 10,
-        "minLength": 10,
-        "type": "string"
-       },
-       {
-        "type": "null"
-       }
-      ],
-      "title": "Recovery Code"
-     }
-    },
-    "title": "MfaVerifyIn",
-    "type": "object"
    },
    "MilestoneIn": {
     "additionalProperties": false,
@@ -16430,23 +16242,6 @@
     "title": "RecordIn",
     "type": "object"
    },
-   "RecoveryCodesOut": {
-    "properties": {
-     "recovery_codes": {
-      "description": "Single-use; shown once. Store them safely.",
-      "items": {
-       "type": "string"
-      },
-      "title": "Recovery Codes",
-      "type": "array"
-     }
-    },
-    "required": [
-     "recovery_codes"
-    ],
-    "title": "RecoveryCodesOut",
-    "type": "object"
-   },
    "RefreshIn": {
     "additionalProperties": false,
     "properties": {
@@ -17143,11 +16938,6 @@
       "title": "Max Upload Bytes",
       "type": "integer"
      },
-     "partner_mfa": {
-      "const": "optional",
-      "title": "Partner Mfa",
-      "type": "string"
-     },
      "password_min_length": {
       "title": "Password Min Length",
       "type": "integer"
@@ -17171,17 +16961,11 @@
      "reset_link_path": {
       "title": "Reset Link Path",
       "type": "string"
-     },
-     "staff_mfa_required": {
-      "title": "Staff Mfa Required",
-      "type": "boolean"
      }
     },
     "required": [
      "password_min_length",
      "password_rules",
-     "staff_mfa_required",
-     "partner_mfa",
      "login_max_failures",
      "login_lockout_minutes",
      "access_token_minutes",
@@ -18289,10 +18073,6 @@
       ],
       "title": "Last Login At"
      },
-     "mfa_enabled": {
-      "title": "Mfa Enabled",
-      "type": "boolean"
-     },
      "staff_role": {
       "anyOf": [
        {
@@ -18325,7 +18105,6 @@
      "full_name",
      "staff_role",
      "status",
-     "mfa_enabled",
      "last_login_at"
     ],
     "title": "StaffOut",
@@ -19490,16 +19269,6 @@
      "expires_in": {
       "title": "Expires In",
       "type": "integer"
-     },
-     "mfa_enrollment_required": {
-      "default": false,
-      "title": "Mfa Enrollment Required",
-      "type": "boolean"
-     },
-     "mfa_required": {
-      "default": false,
-      "title": "Mfa Required",
-      "type": "boolean"
      },
      "refresh_token": {
       "title": "Refresh Token",
@@ -31151,7 +30920,7 @@
       "HTTPBearer": []
      }
     ],
-    "summary": "Effective password, session, MFA, rate-limit and upload policy (read-only)",
+    "summary": "Effective password, session, rate-limit and upload policy (read-only)",
     "tags": [
      "admin-reference"
     ]
@@ -31661,7 +31430,7 @@
       "HTTPBearer": []
      }
     ],
-    "summary": "Invite a staff user (they set a password, then enroll MFA)",
+    "summary": "Invite a staff user (they set a password)",
     "tags": [
      "admin"
     ]
@@ -32135,94 +31904,6 @@
     "summary": "Deactivate",
     "tags": [
      "admin"
-    ]
-   }
-  },
-  "/api/v1/admin/users/{user_id}/mfa-reset": {
-   "post": {
-    "operationId": "mfa_reset_api_v1_admin_users__user_id__mfa_reset_post",
-    "parameters": [
-     {
-      "in": "path",
-      "name": "user_id",
-      "required": true,
-      "schema": {
-       "format": "uuid",
-       "title": "User Id",
-       "type": "string"
-      }
-     }
-    ],
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ApiResponse_NoneType_"
-        }
-       }
-      },
-      "description": "Successful Response"
-     },
-     "401": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Unauthorized"
-     },
-     "403": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Forbidden"
-     },
-     "404": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Not Found"
-     },
-     "409": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Conflict"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Unprocessable Entity"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Clear a staff member's MFA after a lost device (they must re-enroll)",
-    "tags": [
-     "admin-operations"
     ]
    }
   },
@@ -32730,366 +32411,6 @@
      }
     ],
     "summary": "Update your own name and phone (staff and partners); audited",
-    "tags": [
-     "auth"
-    ]
-   }
-  },
-  "/api/v1/auth/mfa/confirm": {
-   "post": {
-    "operationId": "mfa_confirm_api_v1_auth_mfa_confirm_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/MfaCodeIn"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ApiResponse_RecoveryCodesOut_"
-        }
-       }
-      },
-      "description": "Successful Response"
-     },
-     "401": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Unauthorized"
-     },
-     "409": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Conflict"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     },
-     "429": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Too Many Requests"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Confirm enrollment with the first code; returns recovery codes once",
-    "tags": [
-     "auth"
-    ]
-   }
-  },
-  "/api/v1/auth/mfa/disable": {
-   "post": {
-    "operationId": "mfa_disable_api_v1_auth_mfa_disable_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/MfaDisableIn"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ApiResponse_NoneType_"
-        }
-       }
-      },
-      "description": "Successful Response"
-     },
-     "400": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Bad Request"
-     },
-     "401": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Unauthorized"
-     },
-     "409": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Conflict"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     },
-     "429": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Too Many Requests"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Turn MFA off (partner accounts only; password and a current code required)",
-    "tags": [
-     "auth"
-    ]
-   }
-  },
-  "/api/v1/auth/mfa/enroll": {
-   "post": {
-    "operationId": "mfa_enroll_api_v1_auth_mfa_enroll_post",
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ApiResponse_MfaEnrollOut_"
-        }
-       }
-      },
-      "description": "Successful Response"
-     },
-     "401": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Unauthorized"
-     },
-     "429": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Too Many Requests"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Start TOTP enrollment (works before MFA is verified; staff must enroll)",
-    "tags": [
-     "auth"
-    ]
-   }
-  },
-  "/api/v1/auth/mfa/recovery-codes": {
-   "post": {
-    "operationId": "mfa_regenerate_api_v1_auth_mfa_recovery_codes_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/MfaCodeIn"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ApiResponse_RecoveryCodesOut_"
-        }
-       }
-      },
-      "description": "Successful Response"
-     },
-     "401": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Unauthorized"
-     },
-     "409": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Conflict"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     },
-     "429": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Too Many Requests"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Replace recovery codes (needs a current authenticator code); old codes stop working",
-    "tags": [
-     "auth"
-    ]
-   }
-  },
-  "/api/v1/auth/mfa/verify": {
-   "post": {
-    "operationId": "mfa_verify_api_v1_auth_mfa_verify_post",
-    "requestBody": {
-     "content": {
-      "application/json": {
-       "schema": {
-        "$ref": "#/components/schemas/MfaVerifyIn"
-       }
-      }
-     },
-     "required": true
-    },
-    "responses": {
-     "200": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ApiResponse_NoneType_"
-        }
-       }
-      },
-      "description": "Successful Response"
-     },
-     "401": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Unauthorized"
-     },
-     "409": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Conflict"
-     },
-     "422": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      },
-      "description": "Validation Error"
-     },
-     "429": {
-      "content": {
-       "application/json": {
-        "schema": {
-         "$ref": "#/components/schemas/ErrorResponse"
-        }
-       }
-      },
-      "description": "Too Many Requests"
-     }
-    },
-    "security": [
-     {
-      "HTTPBearer": []
-     }
-    ],
-    "summary": "Complete sign-in with a TOTP code or a one-time recovery code",
     "tags": [
      "auth"
     ]

@@ -40,7 +40,7 @@ def _guard(route: APIRoute) -> tuple[str, frozenset[StaffRole]]:
             return "staff", allowed or frozenset(StaffRole)
         if call is require_partner:
             return "partner", frozenset()
-        if getattr(call, "__name__", "") in ("get_auth", "get_auth_pending_mfa"):
+        if getattr(call, "__name__", "") in ("get_auth",):
             kind = "authenticated"
     return kind, roles
 

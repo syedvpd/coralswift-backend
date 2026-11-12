@@ -363,7 +363,6 @@ class StaffOut(BaseModel):
     full_name: str
     staff_role: StaffRole | None
     status: UserStatus
-    mfa_enabled: bool
     last_login_at: datetime | None
     created_at: datetime | None = None
     updated_at: datetime | None = None

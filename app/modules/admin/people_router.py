@@ -99,7 +99,6 @@ class AccountOut(BaseModel):
     staff_role: StaffRole | None
     status: UserStatus
     invitation_state: Literal["none", "pending", "expired", "revoked", "accepted"]
-    mfa_enabled: bool
     last_login_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -179,7 +178,6 @@ def _account_rows(db: Session, users: list[User]) -> list[AccountOut]:
             staff_role=u.staff_role,
             status=u.status,
             invitation_state=auth_service.invitation_state(db, u),  # type: ignore[arg-type,unused-ignore]
-            mfa_enabled=u.mfa_enabled_at is not None,
             last_login_at=u.last_login_at,
             created_at=u.created_at,
             updated_at=u.updated_at,

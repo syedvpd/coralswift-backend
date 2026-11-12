@@ -59,7 +59,6 @@ def test_staging_is_hardened_and_restricts_recipients() -> None:
         {"debug": True},
         {"allowed_hosts": "*"},
         {"captcha_enabled": False},
-        {"staff_mfa_required": False},
     ):
         with pytest.raises(ValidationError):
             make(**{**base, "email_recipient_allowlist": "qa@example.com", **bad})

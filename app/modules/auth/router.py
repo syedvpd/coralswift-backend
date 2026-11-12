@@ -7,12 +7,12 @@ from sqlalchemy import select
 
 from app.common.responses import ApiResponse, ErrorResponse, ok
 from app.core.config import Settings, get_settings
-from app.core.exceptions import AppError, NotFoundError
+from app.core.exceptions import NotFoundError
 from app.core.protection import client_ip, rate_limit
 from app.database.dependencies import DbSession
 from app.modules.auth import service
 from app.modules.auth.constants import StaffRole, UserType
-from app.modules.auth.dependencies import AuthDep, PendingAuthDep
+from app.modules.auth.dependencies import AuthDep
 from app.modules.auth.models import AuthSession, User
 from app.modules.auth.permissions import permissions_for, role_matrix
 from app.modules.auth.schemas import (
@@ -20,15 +20,10 @@ from app.modules.auth.schemas import (
     ChangePasswordIn,
     LoginIn,
     MeOut,
-    MfaCodeIn,
-    MfaDisableIn,
-    MfaEnrollOut,
-    MfaVerifyIn,
     OrganizationRef,
     PasswordResetConfirmIn,
     PasswordResetRequestIn,
     ProfileUpdateIn,
-    RecoveryCodesOut,
     RefreshIn,
     SessionOut,
     TokenOut,
@@ -81,12 +76,8 @@ def login(
         ip=client_ip(request),
         user_agent=request.headers.get("user-agent"),
     )
-    out = _tokens(pair)
-    out.mfa_required = user.mfa_enabled_at is not None
-    out.mfa_enrollment_required = (
-        user.user_type is UserType.STAFF and settings.staff_mfa_required and not out.mfa_required
-    )
-    return ok(out, "Signed in")
+    del user
+    return ok(_tokens(pair), "Signed in")
 
 
 @router.post(
@@ -105,7 +96,7 @@ def refresh(payload: RefreshIn, db: DbSession, settings: SettingsDep) -> ApiResp
 @router.post(
     "/logout", response_model=ApiResponse[None], responses=_ERR, summary="Revoke this session"
 )
-def logout(auth: PendingAuthDep, db: DbSession) -> ApiResponse[None]:
+def logout(auth: AuthDep, db: DbSession) -> ApiResponse[None]:
     service.revoke_session(db, auth.session, "logout")
     db.commit()
     return ok(None, "Signed out")
@@ -229,14 +220,12 @@ def _me_out(db: DbSession, settings: Settings, user: User) -> MeOut:
         partner_role=partner_role,
         permissions=list(PARTNER_PERMISSIONS[membership.role]) if membership else [],
         organization=org_ref,
-        mfa_enabled=user.mfa_enabled_at is not None,
-        mfa_required=user.user_type is UserType.STAFF and settings.staff_mfa_required,
         last_login_at=user.last_login_at,
     )
 
 
 @router.get("/me", response_model=ApiResponse[MeOut], responses=_ERR, summary="Current account")
-def me(auth: PendingAuthDep, db: DbSession, settings: SettingsDep) -> ApiResponse[MeOut]:
+def me(auth: AuthDep, db: DbSession, settings: SettingsDep) -> ApiResponse[MeOut]:
     return ok(_me_out(db, settings, auth.user))
 
 
@@ -253,21 +242,6 @@ def update_my_profile(
         db, auth.user.id, {k: getattr(payload, k) for k in payload.model_fields_set}
     )
     return ok(_me_out(db, settings, user), "Profile updated")
-
-
-@router.post(
-    "/mfa/disable",
-    response_model=ApiResponse[None],
-    dependencies=AUTH_LIMIT,
-    responses={**_ERR, 400: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
-    summary="Turn MFA off (partner accounts only; password and a current code required)",
-)
-def mfa_disable(
-    payload: MfaDisableIn, auth: AuthDep, db: DbSession, settings: SettingsDep
-) -> ApiResponse[None]:
-    service.disable_mfa(db, settings, auth.user, payload.password, payload.code)
-    service.revoke_other_sessions(db, auth.user, auth.session)
-    return ok(None, "MFA disabled")
 
 
 @router.get("/sessions", response_model=ApiResponse[list[SessionOut]], responses=_ERR)
@@ -317,73 +291,3 @@ def revoke(session_id: uuid.UUID, auth: AuthDep, db: DbSession) -> ApiResponse[N
     service.revoke_session(db, session, "user_revoked")
     db.commit()
     return ok(None, "Session revoked")
-
-
-# ------------------------------------------------------------------ MFA (TOTP)
-@router.post(
-    "/mfa/enroll",
-    response_model=ApiResponse[MfaEnrollOut],
-    dependencies=AUTH_LIMIT,
-    responses=_ERR,
-    summary="Start TOTP enrollment (works before MFA is verified; staff must enroll)",
-)
-def mfa_enroll(
-    auth: PendingAuthDep, db: DbSession, settings: SettingsDep
-) -> ApiResponse[MfaEnrollOut]:
-    secret, uri = service.begin_mfa_enrollment(db, settings, auth.user)
-    return ok(
-        MfaEnrollOut(secret=secret, otpauth_uri=uri), "Scan the secret, then confirm with a code"
-    )
-
-
-@router.post(
-    "/mfa/confirm",
-    response_model=ApiResponse[RecoveryCodesOut],
-    dependencies=AUTH_LIMIT,
-    responses={**_ERR, 409: {"model": ErrorResponse}},
-    summary="Confirm enrollment with the first code; returns recovery codes once",
-)
-def mfa_confirm(
-    payload: MfaCodeIn, auth: PendingAuthDep, db: DbSession, settings: SettingsDep
-) -> ApiResponse[RecoveryCodesOut]:
-    codes = service.confirm_mfa_enrollment(db, settings, auth.user, auth.session, payload.code)
-    return ok(RecoveryCodesOut(recovery_codes=codes), "MFA enabled")
-
-
-@router.post(
-    "/mfa/verify",
-    response_model=ApiResponse[None],
-    dependencies=AUTH_LIMIT,
-    responses={**_ERR, 409: {"model": ErrorResponse}},
-    summary="Complete sign-in with a TOTP code or a one-time recovery code",
-)
-def mfa_verify(
-    payload: MfaVerifyIn, auth: PendingAuthDep, db: DbSession, settings: SettingsDep
-) -> ApiResponse[None]:
-    if (payload.code is None) == (payload.recovery_code is None):
-        raise AppError(
-            "Provide exactly one of code or recovery_code", status_code=422, code="VALIDATION_ERROR"
-        )
-    service.verify_mfa(
-        db,
-        settings,
-        auth.user,
-        auth.session,
-        code=payload.code,
-        recovery_code=payload.recovery_code,
-    )
-    return ok(None, "MFA verified")
-
-
-@router.post(
-    "/mfa/recovery-codes",
-    response_model=ApiResponse[RecoveryCodesOut],
-    dependencies=AUTH_LIMIT,
-    responses={**_ERR, 409: {"model": ErrorResponse}},
-    summary="Replace recovery codes (needs a current authenticator code); old codes stop working",
-)
-def mfa_regenerate(
-    payload: MfaCodeIn, auth: AuthDep, db: DbSession, settings: SettingsDep
-) -> ApiResponse[RecoveryCodesOut]:
-    codes = service.regenerate_recovery_codes(db, settings, auth.user, payload.code)
-    return ok(RecoveryCodesOut(recovery_codes=codes), "Recovery codes replaced")
