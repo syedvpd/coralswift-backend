@@ -26,7 +26,7 @@ class BrokenRedis:
 def test_builds_once_then_serves_cached_json_with_ttl_and_prefix() -> None:
     client, calls = FakeRedis(), []
 
-    def build() -> dict:
+    def build() -> dict[str, object]:
         calls.append(1)
         return {"at": dt.datetime(2026, 1, 1, tzinfo=dt.UTC), "n": 3}
 
