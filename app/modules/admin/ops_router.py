@@ -482,6 +482,8 @@ def preview_template(
     summary="Business KPIs (PRD s.20). No targets: the PRD asks for a baseline first",
 )
 def kpis(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
     staff: AdminDep,
     db: DbSession,
     created_from: Annotated[datetime | None, Query()] = None,
@@ -490,9 +492,30 @@ def kpis(
         uuid.UUID | None, Query(description="enquiries assigned to this staff member")
     ] = None,
     category: Annotated[
-        ProjectCategory | None, Query(description="project category of project enquiries")
+        ProjectCategory | None,
+        Query(description="project category of project enquiries"),
     ] = None,
 ) -> ApiResponse[KpisOut]:
+    # Output varies only by super-admin vs BDM and the filters, so that is the cache key.
+    is_super = staff.user.staff_role is StaffRole.SUPER_ADMINISTRATOR
+    key = f"kpis:{is_super}:{created_from}:{created_to}:{assignee_id}:{category}"
+    return ok(
+        request.app.state.cache.get_or_set(
+            key,
+            settings.cache_ttl_seconds,
+            lambda: _kpis(staff, db, created_from, created_to, assignee_id, category),
+        )
+    )
+
+
+def _kpis(
+    staff: StaffContext,
+    db: Session,
+    created_from: datetime | None,
+    created_to: datetime | None,
+    assignee_id: uuid.UUID | None,
+    category: ProjectCategory | None,
+) -> dict[str, Any]:
     types = service.visible_types(staff)
     base = select(Enquiry).where(Enquiry.enquiry_type.in_(types))
     if created_from:
@@ -633,7 +656,7 @@ def kpis(
         out["document_review_turnaround_hours_avg"] = (
             round(float(hours), 2) if hours is not None else None
         )
-    return ok(out)
+    return out
 
 
 def _date_filters(

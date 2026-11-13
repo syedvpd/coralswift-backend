@@ -64,6 +64,8 @@ class Settings(BaseSettings):
     email_backend: Literal["console", "brevo"] = "console"
     brevo_api_key: SecretStr | None = None
     scanner_backend: Literal["none", "clamav"] = "none"  # D33: none = quarantine-only
+    redis_url: SecretStr | None = None  # unset = no caching
+    cache_ttl_seconds: int = Field(default=60, gt=0, le=3600)
     clamav_host: str = "localhost"
     clamav_port: int = Field(default=3310, ge=1, le=65535)
     clamav_timeout_seconds: float = Field(default=10.0, gt=0, le=120)

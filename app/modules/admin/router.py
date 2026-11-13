@@ -129,8 +129,16 @@ FiltersDep = Annotated[EnquiryFilters, Depends()]
     responses=_ERR,
     summary="Dashboard counters (scoped to your role)",
 )
-def overview(staff: AdminDep, db: DbSession) -> ApiResponse[OverviewOut]:
-    return ok(service.overview(db, staff))
+def overview(
+    request: Request, settings: SettingsDep, staff: AdminDep, db: DbSession
+) -> ApiResponse[OverviewOut]:
+    # Counters differ only between super-admin and other staff, so that is the cache key.
+    key = f"overview:{service._is_super(staff)}"
+    return ok(
+        request.app.state.cache.get_or_set(
+            key, settings.cache_ttl_seconds, lambda: service.overview(db, staff)
+        )
+    )
 
 
 @router.get(

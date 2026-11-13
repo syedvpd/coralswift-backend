@@ -4,12 +4,14 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import redis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.v1.router import api_router
+from app.core.cache import Cache
 from app.core.config import Settings, load_settings
 from app.core.constants import REQUEST_ID_HEADER
 from app.core.exception_handlers import register_exception_handlers
@@ -73,6 +75,14 @@ def create_app(
     app.state.email_sender = email_sender or build_email_sender(settings)
     app.state.bot_verifier = bot_verifier or build_bot_verifier(settings)
     app.state.rate_limiter = FixedWindowLimiter()
+    app.state.cache = Cache(
+        redis.Redis.from_url(
+            settings.redis_url.get_secret_value(), socket_timeout=0.5, socket_connect_timeout=0.5
+        )
+        if settings.redis_url
+        else None,
+        settings.app_env,
+    )
 
     register_exception_handlers(app)
     app.include_router(health_router)

@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
 from app.common.responses import ApiResponse, ok
 from app.core.config import Settings, get_settings
@@ -107,5 +107,8 @@ for _router in (
 
 
 @api_router.get("/meta", tags=["meta"], response_model=ApiResponse[dict[str, str]])
-def meta(settings: Annotated[Settings, Depends(get_settings)]) -> ApiResponse[dict[str, str]]:
+def meta(
+    response: Response, settings: Annotated[Settings, Depends(get_settings)]
+) -> ApiResponse[dict[str, str]]:
+    response.headers["Cache-Control"] = "public, max-age=300"
     return ok({"name": settings.app_name, "version": settings.app_version, "api": "v1"})
