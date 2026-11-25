@@ -117,10 +117,11 @@ def test_replace_keeps_history_and_download_audited(
 ) -> None:
     p = onboard_partner(client, db, settings, email)
     doc_id = up(client, p).json()["data"]["id"]
+    docx_payload = factories.docx_bytes()
     second = client.post(
         f"{D}/{doc_id}/versions",
         headers=p.headers,
-        files={"file": ("v2.docx", factories.docx_bytes(), "application/octet-stream")},
+        files={"file": ("v2.docx", docx_payload, "application/octet-stream")},
     )
     assert second.status_code == 201 and second.json()["data"]["current_version"]["version_no"] == 2
     hist = client.get(f"{D}/{doc_id}/history", headers=p.headers).json()["data"]
@@ -131,7 +132,7 @@ def test_replace_keeps_history_and_download_audited(
         old.headers["content-type"] == "application/pdf"
         and old.headers["cache-control"] == "private, no-store"
     )
-    assert client.get(f"{D}/{doc_id}/download", headers=p.headers).content == factories.docx_bytes()
+    assert client.get(f"{D}/{doc_id}/download", headers=p.headers).content == docx_payload
     actions = list(db.execute(select(Activity.action)).scalars())
     assert actions.count("document.downloaded") == 2 and "document.replaced" in actions
     assert client.get(f"{D}/{doc_id}/download?version=9", headers=p.headers).status_code == 404
