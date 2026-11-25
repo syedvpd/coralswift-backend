@@ -18,8 +18,16 @@ INDEXES = [
     ("ix_milestone_deliverables_milestone_id", "milestone_deliverables", ["milestone_id"]),
     ("ix_milestone_deliverables_organization_id", "milestone_deliverables", ["organization_id"]),
     ("ix_milestone_deliverables_status", "milestone_deliverables", ["status"]),
-    ("ix_opportunity_brief_accesses_opportunity_id", "opportunity_brief_accesses", ["opportunity_id"]),
-    ("ix_opportunity_brief_accesses_organization_id", "opportunity_brief_accesses", ["organization_id"]),
+    (
+        "ix_opportunity_brief_accesses_opportunity_id",
+        "opportunity_brief_accesses",
+        ["opportunity_id"],
+    ),
+    (
+        "ix_opportunity_brief_accesses_organization_id",
+        "opportunity_brief_accesses",
+        ["organization_id"],
+    ),
     ("ix_opportunity_invitations_opportunity_id", "opportunity_invitations", ["opportunity_id"]),
     ("ix_opportunity_invitations_organization_id", "opportunity_invitations", ["organization_id"]),
     ("ix_opportunity_questions_opportunity_id", "opportunity_questions", ["opportunity_id"]),

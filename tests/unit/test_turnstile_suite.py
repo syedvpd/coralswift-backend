@@ -253,10 +253,14 @@ def test_cloudflare_unavailable_fails_closed() -> None:
 
     assert _make_verifier(connect_error_handler).verify("tok", "1.2.3.4") is False
 
+    def _status_handler(code: int) -> Callable[[httpx.Request], httpx.Response]:
+        def _handler(_: httpx.Request) -> httpx.Response:
+            return httpx.Response(code)
+
+        return _handler
+
     for status in (500, 502, 503, 504):
-        assert (
-            _make_verifier(lambda _, s=status: httpx.Response(s)).verify("tok", "1.2.3.4") is False
-        )
+        assert _make_verifier(_status_handler(status)).verify("tok", "1.2.3.4") is False
 
 
 # ---------------------------------------------------------------------------

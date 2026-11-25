@@ -34,21 +34,31 @@
    ```python
    ReviewerDep = Annotated[
        StaffContext,
-       Depends(require_staff(
-           StaffRole.SUPER_ADMINISTRATOR,
-           StaffRole.PARTNER_REVIEWER,
-           StaffRole.BUSINESS_DEVELOPMENT_MANAGER,  # <-- ADD
-           StaffRole.AUTHORIZED_MANAGEMENT          # <-- ADD
-       )),
+       Depends(
+           require_staff(
+               StaffRole.SUPER_ADMINISTRATOR,
+               StaffRole.PARTNER_REVIEWER,
+               StaffRole.BUSINESS_DEVELOPMENT_MANAGER,  # <-- ADD
+               StaffRole.AUTHORIZED_MANAGEMENT,  # <-- ADD
+           )
+       ),
    ]
    ```
 
 3. **Restrict Terminal Status Transitions:**
    In `app/modules/reviews/router.py`:
    ```python
-   TERMINAL_APPROVAL_STATUSES = {PortalStatus.PILOT_ONBOARDING, PortalStatus.SCALE_UP, PortalStatus.REJECTED}
+   TERMINAL_APPROVAL_STATUSES = {
+       PortalStatus.PILOT_ONBOARDING,
+       PortalStatus.SCALE_UP,
+       PortalStatus.REJECTED,
+   }
    if payload.target_status in TERMINAL_APPROVAL_STATUSES:
        if staff.role not in (StaffRole.SUPER_ADMINISTRATOR, StaffRole.AUTHORIZED_MANAGEMENT):
-           raise AppError("Terminal decision requires Authorized Management approval", status_code=403, code="FORBIDDEN")
+           raise AppError(
+               "Terminal decision requires Authorized Management approval",
+               status_code=403,
+               code="FORBIDDEN",
+           )
    ```
 

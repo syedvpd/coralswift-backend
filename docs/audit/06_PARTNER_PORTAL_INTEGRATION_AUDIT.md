@@ -34,12 +34,9 @@ A rigorous code and query inspection was conducted across all partner endpoints 
 
 ```python
 # Standard Pattern Enforced in all Partner Services:
-stmt = (
-    select(PortalApplication)
-    .where(
-        PortalApplication.id == application_id,
-        PortalApplication.organization_id == ctx.organization_id  # Mandatory tenant boundary
-    )
+stmt = select(PortalApplication).where(
+    PortalApplication.id == application_id,
+    PortalApplication.organization_id == ctx.organization_id,  # Mandatory tenant boundary
 )
 result = db.execute(stmt).scalar_one_or_none()
 if result is None:

@@ -6,6 +6,7 @@ from decimal import Decimal
 from unittest.mock import MagicMock
 
 import pytest
+from fastapi import FastAPI
 
 from app.core.config import Settings
 from app.core.exceptions import AppError
@@ -14,6 +15,7 @@ from app.modules.auth.constants import StaffRole, UserType
 from app.modules.auth.dependencies import StaffContext
 from app.modules.auth.permissions import permissions_for, role_matrix
 from app.modules.delivery_governance import service as deliv_service
+from app.modules.delivery_governance.constants import ContractStatus
 from app.modules.delivery_governance.schemas import ContractSignIn
 from app.modules.opportunities import service as opp_service
 from app.modules.opportunities.constants import OpportunityStatus, OpportunityVisibility
@@ -41,7 +43,7 @@ def _staff_ctx(role: StaffRole) -> StaffContext:
     return StaffContext(user=user, session=session)
 
 
-def _test_app():
+def _test_app() -> FastAPI:
     settings = Settings(
         _env_file=None,
         app_env="testing",
@@ -255,7 +257,7 @@ def test_contract_signature_hash_and_terms_validation() -> None:
 
     db = MagicMock()
     contract = MagicMock()
-    contract.status = deliv_service.ContractStatus.SENT_FOR_SIGNATURE
+    contract.status = ContractStatus.SENT_FOR_SIGNATURE
     db.execute.return_value.scalar_one_or_none.return_value = contract
     partner = MagicMock()
     partner.organization_id = uuid.uuid4()
