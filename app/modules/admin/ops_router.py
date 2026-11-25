@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
 from app.common.utilities import utcnow
+from app.core.cache_hooks import NS_ADMIN_REPORTS, NS_ADMIN_SETTINGS
+from app.core.cache_http import cached_read
 from app.core.config import Settings, get_settings
 from app.core.exceptions import AppError, NotFoundError
 from app.database.dependencies import DbSession
@@ -130,7 +132,10 @@ class SettingIn(BaseModel):
     responses=_ERR,
     summary="Stored settings and the keys that can be set",
 )
-def list_settings(staff: SuperAdminDep, db: DbSession) -> ApiResponse[SettingsOut]:
+@cached_read(NS_ADMIN_SETTINGS, "cache_admin_settings_ttl_seconds", ApiResponse[SettingsOut])
+def list_settings(
+    request: Request, staff: SuperAdminDep, db: DbSession
+) -> ApiResponse[SettingsOut]:
     return ok(
         SettingsOut(
             values=cfg.list_all(db),
@@ -481,7 +486,9 @@ def preview_template(
     responses=_ERR,
     summary="Business KPIs (PRD s.20). No targets: the PRD asks for a baseline first",
 )
+@cached_read(NS_ADMIN_REPORTS, "cache_admin_report_ttl_seconds", ApiResponse[KpisOut])
 def kpis(
+    request: Request,
     staff: AdminDep,
     db: DbSession,
     created_from: Annotated[datetime | None, Query()] = None,
@@ -653,7 +660,9 @@ def _date_filters(
     responses=_ERR,
     summary="Follow-up counts by kind and open/completed/cancelled state",
 )
+@cached_read(NS_ADMIN_REPORTS, "cache_admin_report_ttl_seconds", ApiResponse[FollowUpReportOut])
 def follow_up_report(
+    request: Request,
     staff: ReportStaffDep,
     db: DbSession,
     created_from: Annotated[datetime | None, Query()] = None,
@@ -707,7 +716,11 @@ def follow_up_report(
     responses=_ERR,
     summary="Partner document version review counts and observed average turnaround",
 )
+@cached_read(
+    NS_ADMIN_REPORTS, "cache_admin_report_ttl_seconds", ApiResponse[DocumentReviewReportOut]
+)
 def document_review_report(
+    request: Request,
     staff: SuperAdminDep,
     db: DbSession,
     created_from: Annotated[datetime | None, Query()] = None,
@@ -747,7 +760,11 @@ def document_review_report(
     responses=_ERR,
     summary="Email outbox counts by delivery status and template",
 )
+@cached_read(
+    NS_ADMIN_REPORTS, "cache_admin_report_ttl_seconds", ApiResponse[CommunicationReportOut]
+)
 def communication_report(
+    request: Request,
     staff: SuperAdminDep,
     db: DbSession,
     created_from: Annotated[datetime | None, Query()] = None,

@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.common.utilities import utcnow
+from app.core.cache_hooks import NS_ADMIN_REPORTS, mark_dirty, ns_notif
 from app.core.config import Settings
 from app.integrations.email import EmailDeliveryError, EmailMessage, EmailSender
 from app.modules.admin.models import NotificationTemplate
@@ -71,6 +72,8 @@ def queue_notification(
         )
         .on_conflict_do_nothing(index_elements=["dedupe_key"])
     )
+    # pg_insert bypasses the ORM hook: drop this recipient's cached notification views on commit.
+    mark_dirty(db, ns_notif(recipient), NS_ADMIN_REPORTS)
 
 
 def _queue(

@@ -22,6 +22,8 @@ from app.modules.collaboration.staff_router import router as collab_staff_router
 from app.modules.content.router import admin as content_admin_router
 from app.modules.content.router import claims as content_claims_router
 from app.modules.content.router import public as content_public_router
+from app.modules.delivery_governance.router import admin_router as delivery_admin_router
+from app.modules.delivery_governance.router import partner_router as delivery_partner_router
 from app.modules.documents.router import router as documents_router
 from app.modules.engagement.router import admin as engagement_admin_router
 from app.modules.engagement.router import partner as engagement_partner_router
@@ -31,6 +33,8 @@ from app.modules.media import router as media_routes
 from app.modules.messaging.router import router as messaging_router
 from app.modules.notifications import webhook as email_webhook
 from app.modules.onboarding import router as onboarding_routes
+from app.modules.opportunities.router import admin_router as opportunities_admin_router
+from app.modules.opportunities.router import partner_router as opportunities_partner_router
 from app.modules.organizations.extras import admin as profile_changes_admin_router
 from app.modules.organizations.extras import partner as partner_dashboard_router
 from app.modules.organizations.router import router as organizations_router
@@ -102,6 +106,10 @@ for _router in (
     collab_partner.discussions,
     collab_partner.meetings,
     collab_partner.follow_ups,
+    opportunities_admin_router,
+    opportunities_partner_router,
+    delivery_admin_router,
+    delivery_partner_router,
 ):
     api_router.include_router(_router)
 

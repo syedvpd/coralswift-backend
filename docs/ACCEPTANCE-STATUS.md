@@ -80,3 +80,16 @@ Statuses: **DONE** = implemented and automated tests pass (375 passed on the fin
 
 ## Business decisions answered with defaults (your instruction)
 Thresholds and mandatory categories: configurable, unset. Retention: blocked until legal sets it. Partner roles: Owner and Member. Indicators: turnaround and completeness. Queue targets: 24 h first response, 48 h escalation target (the escalation job fires 48 h after creation when there is still no first response; the 24 h target only sets the response due time). Providers: Render, Supabase, Brevo; no calendar, no CRM. Meetings: staff-attested only. Privacy SLA: 72 h verification, 30 days completion, provisional.
+
+## Redis integration
+| Item | Status | Evidence |
+|---|---|---|
+| Shared client, pool, timeouts, lifespan start/close, circuit breaker | DONE (code, local) | `app/core/redis.py`, `tests/api/test_redis.py` |
+| Cache service, namespaced + versioned keys, stampede lock, secret-field guard | DONE (local) | `app/core/cache.py`, `tests/api/test_redis.py` |
+| Cached reads: public CMS (3), admin overview/workload/enquiries/organizations/settings/4 reports, partner notifications (2)/projects/performance (3) | DONE (local) | `docs/REDIS-ENDPOINT-COVERAGE.md` (all 283 routes classified) |
+| Commit-safe invalidation (ORM hook + explicit `mark_dirty` for bulk statements) | DONE (local) | `app/core/cache_hooks.py`, rollback/commit test |
+| Redis rate limiting shared across workers, per-process fallback (never fail open) | DONE (local) | `DistributedLimiter`, 2-worker and 40-thread tests |
+| Benchmarks (disabled / miss / hit) | DONE (local, in-process) | `docs/REDIS-ARCHITECTURE.md` section 11 |
+| Partner applications list, reviewer views, documents, auth, audit | NOT CACHED by design | reasons in the coverage document |
+| Render Key Value in `render.yaml` and `render.staging.yaml` | DECLARED, NOT PROVISIONED | blueprint only |
+| Live Redis connectivity on Render (staging, production) | BLOCKED EXTERNAL | needs the blueprint applied in the Render account; verify `/health/ready` -> `"redis": "ok"` |

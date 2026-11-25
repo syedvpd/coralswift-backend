@@ -21,6 +21,8 @@ services:
       - {key: MAX_REQUEST_BODY_BYTES, value: "12582912"}
       - {key: DATABASE_URL, sync: false}               # staging database only
       - {key: SECRET_KEY, sync: false}                 # newly generated, unique to staging
+      - key: REDIS_URL
+        fromService: {type: keyvalue, name: coralswift-redis-staging, property: connectionString}
       - {key: TURNSTILE_SECRET_KEY, sync: false}       # Turnstile widget limited to the staging hostname
       - {key: CORS_ALLOWED_ORIGINS, sync: false}       # staging frontend origin(s), no "*"
       - {key: ALLOWED_HOSTS, sync: false}              # staging API hostname, no "*"
@@ -41,6 +43,14 @@ services:
       - {key: NOTIFY_PARTNER_EMAILS, sync: false}
       - {key: NOTIFY_STRATEGIC_EMAILS, sync: false}
 
+  # Staging-only Redis-compatible store (cache + shared rate-limit counters). Private network only.
+  # Never share it with production: cache keys and counters would mix environments.
+  - type: keyvalue
+    name: coralswift-redis-staging
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
   # Staging maintenance. Starts as a dry run so nothing is purged or sent until the owner changes
   # the command to the real one after reviewing the counts (see README, "Staff accounts and scheduled jobs").
   - type: cron
@@ -58,6 +68,8 @@ services:
       - {key: EMAIL_BACKEND, value: brevo}
       - {key: DATABASE_URL, sync: false}
       - {key: SECRET_KEY, sync: false}
+      - key: REDIS_URL
+        fromService: {type: keyvalue, name: coralswift-redis-staging, property: connectionString}
       - {key: TURNSTILE_SECRET_KEY, sync: false}
       - {key: ALLOWED_HOSTS, sync: false}
       - {key: S3_ENDPOINT_URL, sync: false}

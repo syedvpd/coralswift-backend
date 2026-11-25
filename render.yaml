@@ -17,6 +17,8 @@ services:
       - {key: EMAIL_BACKEND, value: brevo}
       - {key: DATABASE_URL, sync: false}
       - {key: SECRET_KEY, sync: false}
+      - key: REDIS_URL
+        fromService: {type: keyvalue, name: coralswift-redis, property: connectionString}
       - {key: CORS_ALLOWED_ORIGINS, sync: false}
       - {key: ALLOWED_HOSTS, sync: false}
       - {key: PORTAL_BASE_URL, sync: false}
@@ -37,6 +39,14 @@ services:
       - {key: NOTIFY_PARTNER_EMAILS, sync: false}
       - {key: NOTIFY_STRATEGIC_EMAILS, sync: false}
 
+  # Redis-compatible cache + shared rate-limit counters. Private network only (no public access);
+  # allkeys-lru so memory pressure evicts cache entries instead of failing writes.
+  - type: keyvalue
+    name: coralswift-redis
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
   # Scheduled maintenance: SLA escalation, expiry reminders, retention purge, email retries.
   - type: cron
     name: coralswift-maintenance
@@ -48,6 +58,8 @@ services:
       - {key: APP_ENV, value: production}
       - {key: DATABASE_URL, sync: false}
       - {key: SECRET_KEY, sync: false}
+      - key: REDIS_URL
+        fromService: {type: keyvalue, name: coralswift-redis, property: connectionString}
       - {key: ALLOWED_HOSTS, sync: false}
       - {key: STORAGE_BACKEND, value: s3}
       - {key: EMAIL_BACKEND, value: brevo}

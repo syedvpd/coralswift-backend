@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Query, Response
+from fastapi import APIRouter, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -17,6 +17,8 @@ from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
 from app.common.utilities import utcnow
 from app.common.validation import Long
+from app.core.cache_hooks import ns_org
+from app.core.cache_http import cached_read
 from app.core.exceptions import AppError, NotFoundError
 from app.database.dependencies import DbSession
 from app.modules.admin import settings_service as cfg
@@ -164,7 +166,14 @@ class SummaryIndicatorOut(BaseModel):
     responses=_ERR,
     summary="Both approved indicators: latest published value or state=unavailable",
 )
-def summary(ctx: PartnerDep, db: DbSession) -> ApiResponse[list[SummaryIndicatorOut]]:
+@cached_read(
+    lambda kw: ns_org(kw["ctx"].organization_id, "performance"),
+    "cache_partner_read_ttl_seconds",
+    ApiResponse[list[SummaryIndicatorOut]],
+)
+def summary(
+    request: Request, ctx: PartnerDep, db: DbSession
+) -> ApiResponse[list[SummaryIndicatorOut]]:
     rows = db.execute(
         _published(ctx.organization_id).order_by(
             PerformanceEntry.indicator_key, PerformanceEntry.period.desc()
@@ -197,8 +206,13 @@ def summary(ctx: PartnerDep, db: DbSession) -> ApiResponse[list[SummaryIndicator
     responses=_ERR,
     summary="Published series of one indicator, oldest first",
 )
+@cached_read(
+    lambda kw: ns_org(kw["ctx"].organization_id, "performance"),
+    "cache_partner_read_ttl_seconds",
+    ApiResponse[list[IndicatorOut]],
+)
 def trends(
-    ctx: PartnerDep, db: DbSession, indicator: Annotated[Key, Query()]
+    request: Request, ctx: PartnerDep, db: DbSession, indicator: Annotated[Key, Query()]
 ) -> ApiResponse[list[IndicatorOut]]:
     rows = db.execute(
         _published(ctx.organization_id)
@@ -214,7 +228,12 @@ def trends(
     responses=_ERR,
     summary="Published indicators grouped by period, newest first",
 )
-def scorecards(ctx: PartnerDep, db: DbSession) -> ApiResponse[list[ScorecardOut]]:
+@cached_read(
+    lambda kw: ns_org(kw["ctx"].organization_id, "performance"),
+    "cache_partner_read_ttl_seconds",
+    ApiResponse[list[ScorecardOut]],
+)
+def scorecards(request: Request, ctx: PartnerDep, db: DbSession) -> ApiResponse[list[ScorecardOut]]:
     rows = db.execute(
         _published(ctx.organization_id).order_by(
             PerformanceEntry.period.desc(), PerformanceEntry.indicator_key

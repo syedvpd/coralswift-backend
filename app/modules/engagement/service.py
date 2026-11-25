@@ -9,6 +9,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.common.utilities import utcnow
+from app.core.cache_hooks import mark_dirty, ns_notif
 from app.core.config import Settings
 from app.core.exceptions import AppError, NotFoundError
 from app.modules.admin import settings_service as cfg
@@ -359,6 +360,7 @@ def execute_deletion(db: Session, staff: StaffContext, request_id: uuid.UUID) ->
             f"deleted-{c.id}@deleted.invalid",
             "+0000000",
         )
+    mark_dirty(db, ns_notif(email))  # bulk UPDATE bypasses the ORM hook
     notified = db.execute(
         update(Notification)
         .where(Notification.recipient == email)

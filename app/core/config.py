@@ -92,6 +92,23 @@ class Settings(BaseSettings):
     login_max_failures: int = Field(default=5, ge=1)
     login_lockout_minutes: int = Field(default=15, ge=1)
     invitation_ttl_hours: int = Field(default=168, ge=1)
+
+    # --- Redis (optional). Unset REDIS_URL = no Redis: caching off, rate limiting per process.
+    redis_url: SecretStr | None = None  # use rediss:// (TLS) for any non-private provider
+    redis_key_prefix: str = Field(default="cs", pattern=r"^[a-z0-9_-]{1,16}$")
+    redis_max_connections: int = Field(default=20, ge=1)
+    redis_connect_timeout_seconds: float = Field(default=2.0, gt=0)
+    redis_socket_timeout_seconds: float = Field(default=1.0, gt=0)
+    redis_retry_after_failure_seconds: float = Field(default=5.0, ge=0)  # circuit-breaker pause
+    cache_enabled: bool = True
+    cache_max_ttl_seconds: int = Field(default=3600, gt=0)  # hard cap on any TTL
+    cache_public_content_ttl_seconds: int = Field(default=300, gt=0)
+    cache_admin_overview_ttl_seconds: int = Field(default=30, gt=0)
+    cache_admin_list_ttl_seconds: int = Field(default=15, gt=0)
+    cache_admin_report_ttl_seconds: int = Field(default=60, gt=0)
+    cache_admin_settings_ttl_seconds: int = Field(default=60, gt=0)
+    cache_partner_read_ttl_seconds: int = Field(default=30, gt=0)
+    cache_notification_ttl_seconds: int = Field(default=30, gt=0)
     password_reset_ttl_minutes: int = Field(default=60, ge=1)
 
     @field_validator(

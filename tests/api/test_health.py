@@ -19,7 +19,9 @@ def test_live(client: TestClient) -> None:
 def test_ready_with_database(client: TestClient) -> None:
     r = client.get("/health/ready")
     assert r.status_code == 200
-    assert r.json()["data"] == {"status": "ready", "database": "ok"}
+    data = dict(r.json()["data"])
+    assert data.pop("redis", "ok") == "ok"  # present only when Redis is configured
+    assert data == {"status": "ready", "database": "ok"}
 
 
 def test_ready_503_when_database_down_and_no_credentials_leak(settings: Settings) -> None:

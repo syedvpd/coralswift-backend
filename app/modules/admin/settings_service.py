@@ -11,6 +11,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.common.utilities import utcnow
+from app.core.cache_hooks import NS_ADMIN_SETTINGS, mark_dirty
 from app.core.exceptions import AppError
 from app.modules.admin.models import SystemSetting
 from app.modules.auth.constants import StaffRole, UserStatus
@@ -188,4 +189,5 @@ def put(db: Session, key: str, value: str, user_id: uuid.UUID) -> str:
 def remove(db: Session, key: str) -> None:
     if key not in REGISTRY:
         raise AppError("Unknown setting", status_code=422, code="UNKNOWN_SETTING")
+    mark_dirty(db, NS_ADMIN_SETTINGS)  # bulk DELETE bypasses the ORM hook
     db.execute(delete(SystemSetting).where(SystemSetting.key == key))

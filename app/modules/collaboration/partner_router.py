@@ -7,13 +7,15 @@ Records that are not shared (or belong to another organisation) answer 404.
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
 from app.common.utilities import utcnow
+from app.core.cache_hooks import ns_org
+from app.core.cache_http import cached_read
 from app.core.exceptions import AppError, NotFoundError
 from app.database.dependencies import DbSession
 from app.modules.auth.dependencies import PartnerContext, PartnerDep
@@ -166,7 +168,13 @@ def project_detail(db: Session, p: PartnerProject) -> dict[str, Any]:
     responses=_ERR,
     summary="Projects staff have shared with your organisation",
 )
+@cached_read(
+    lambda kw: ns_org(kw["ctx"].organization_id, "projects"),
+    "cache_partner_read_ttl_seconds",
+    ApiResponse[list[PartnerProjectRow]],
+)
 def list_projects(
+    request: Request,
     ctx: PartnerDep,
     db: DbSession,
     page: PageDep,

@@ -13,6 +13,8 @@ from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
 from app.common.utilities import utcnow
 from app.common.validation import Long
+from app.core.cache_hooks import mark_dirty, ns_notif
+from app.core.cache_http import cached_read
 from app.core.config import Settings, get_settings
 from app.core.exceptions import AppError, NotFoundError
 from app.core.protection import rate_limit
@@ -242,7 +244,13 @@ def _mine(ctx: PartnerContext) -> list[Any]:
     responses=_ERR,
     summary="Messages sent to you with read state (meta has total and unread counts)",
 )
+@cached_read(
+    lambda kw: ns_notif(kw["ctx"].user.email),
+    "cache_notification_ttl_seconds",
+    ApiResponse[list[PartnerNotificationOut]],
+)
 def my_notifications(
+    request: Request,
     ctx: PartnerDep,
     db: DbSession,
     page: PageDep,
@@ -271,7 +279,12 @@ def my_notifications(
     responses=_ERR,
     summary="Number of unread messages",
 )
-def unread_count(ctx: PartnerDep, db: DbSession) -> ApiResponse[dict[str, int]]:
+@cached_read(
+    lambda kw: ns_notif(kw["ctx"].user.email),
+    "cache_notification_ttl_seconds",
+    ApiResponse[dict[str, int]],
+)
+def unread_count(request: Request, ctx: PartnerDep, db: DbSession) -> ApiResponse[dict[str, int]]:
     n = db.execute(
         select(func.count())
         .select_from(Notification)
@@ -311,6 +324,7 @@ def read_all(ctx: PartnerDep, db: DbSession) -> ApiResponse[dict[str, int]]:
         .where(*_mine(ctx), Notification.read_at.is_(None))
         .values(read_at=utcnow())
     )
+    mark_dirty(db, ns_notif(ctx.user.email))  # bulk UPDATE bypasses the ORM hook
     db.commit()
     return ok({"marked": int(getattr(result, "rowcount", 0))})
 

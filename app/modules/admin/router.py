@@ -10,6 +10,8 @@ from sqlalchemy import and_, func, or_, select
 
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
+from app.core.cache_hooks import NS_ADMIN_ENQUIRIES, NS_ADMIN_ORGS, NS_ADMIN_OVERVIEW
+from app.core.cache_http import cached_read
 from app.core.config import Settings, get_settings
 from app.core.exceptions import NotFoundError
 from app.database.dependencies import DbSession
@@ -37,7 +39,12 @@ from app.modules.admin.schemas import (
 from app.modules.applications.constants import PortalStatus
 from app.modules.auth import service as auth_service
 from app.modules.auth.constants import StaffRole, UserStatus
-from app.modules.auth.dependencies import StaffContext, SuperAdminDep, require_staff
+from app.modules.auth.dependencies import (
+    AuditorDep,
+    StaffContext,
+    SuperAdminDep,
+    require_staff,
+)
 from app.modules.auth.models import User
 from app.modules.documents.audit import audit_denied_download
 from app.modules.enquiries.constants import ActorType, EnquiryStatus, EnquiryType, Priority
@@ -129,8 +136,18 @@ FiltersDep = Annotated[EnquiryFilters, Depends()]
     responses=_ERR,
     summary="Dashboard counters (scoped to your role)",
 )
-def overview(staff: AdminDep, db: DbSession) -> ApiResponse[OverviewOut]:
-    return ok(service.overview(db, staff))
+def overview(request: Request, staff: AdminDep, db: DbSession) -> ApiResponse[OverviewOut]:
+    # Authentication/role checks (AdminDep) run before the cache is consulted. The key carries the
+    # user and role because the counters are scoped by role. Short TTL; also dropped on commit
+    # of any enquiry/application (cache_hooks).
+    parts = {"user": str(staff.user.id), "role": str(staff.user.staff_role)}
+    data = request.app.state.cache.get_or_set(
+        NS_ADMIN_OVERVIEW,
+        parts,
+        request.app.state.settings.cache_admin_overview_ttl_seconds,
+        lambda: OverviewOut.model_validate(service.overview(db, staff)).model_dump(mode="json"),
+    )
+    return ok(OverviewOut.model_validate(data))
 
 
 @router.get(
@@ -139,7 +156,8 @@ def overview(staff: AdminDep, db: DbSession) -> ApiResponse[OverviewOut]:
     responses=_ERR,
     summary="Open enquiry workload counts by assignee (no capacity limits)",
 )
-def workload(staff: AdminDep, db: DbSession) -> ApiResponse[WorkloadOut]:
+@cached_read(NS_ADMIN_OVERVIEW, "cache_admin_overview_ttl_seconds", ApiResponse[WorkloadOut])
+def workload(request: Request, staff: AdminDep, db: DbSession) -> ApiResponse[WorkloadOut]:
     return ok(service.enquiry_workload(db, staff))
 
 
@@ -150,8 +168,9 @@ def workload(staff: AdminDep, db: DbSession) -> ApiResponse[WorkloadOut]:
     responses=_ERR,
     summary="Enquiries / leads (filters, search, pagination)",
 )
+@cached_read(NS_ADMIN_ENQUIRIES, "cache_admin_list_ttl_seconds", ApiResponse[list[EnquiryRow]])
 def list_enquiries(
-    staff: AdminDep, db: DbSession, page: PageDep, f: FiltersDep
+    request: Request, staff: AdminDep, db: DbSession, page: PageDep, f: FiltersDep
 ) -> ApiResponse[list[EnquiryRow]]:
     rows, total = service.list_enquiries(db, staff, page.page_size, page.offset, **f.values)
     return ok([EnquiryRow(**r) for r in rows], meta=page_meta(page, total))
@@ -271,7 +290,9 @@ def download(
     responses=_ERR,
     summary="Partner organizations",
 )
+@cached_read(NS_ADMIN_ORGS, "cache_admin_list_ttl_seconds", ApiResponse[list[OrgRow]])
 def list_orgs(
+    request: Request,
     staff: AdminDep,
     db: DbSession,
     page: PageDep,
@@ -482,7 +503,7 @@ def activate(user_id: uuid.UUID, staff: SuperAdminDep, db: DbSession) -> ApiResp
     summary="Audit log (super administrator)",
 )
 def audit(
-    staff: SuperAdminDep,
+    staff: AuditorDep,
     db: DbSession,
     page: PageDep,
     record_type: Annotated[str | None, Query(max_length=50)] = None,
@@ -544,7 +565,7 @@ def audit(
     responses=_ERR,
     summary="List event actions currently present in the audit log",
 )
-def audit_actions(staff: SuperAdminDep, db: DbSession) -> ApiResponse[list[str]]:
+def audit_actions(staff: AuditorDep, db: DbSession) -> ApiResponse[list[str]]:
     actions = db.execute(select(Activity.action).distinct().order_by(Activity.action)).scalars()
     return ok(list(actions))
 
@@ -555,9 +576,7 @@ def audit_actions(staff: SuperAdminDep, db: DbSession) -> ApiResponse[list[str]]
     responses=_ERR,
     summary="Get one audit event by id (super administrator)",
 )
-def audit_detail(
-    activity_id: uuid.UUID, staff: SuperAdminDep, db: DbSession
-) -> ApiResponse[AuditRow]:
+def audit_detail(activity_id: uuid.UUID, staff: AuditorDep, db: DbSession) -> ApiResponse[AuditRow]:
     activity = db.get(Activity, activity_id)
     if activity is None:
         raise NotFoundError("Audit event not found")
@@ -595,7 +614,7 @@ def audit_detail(
     summary="Export the filtered audit log as formula-safe CSV (super administrator)",
 )
 def export_audit(
-    staff: SuperAdminDep,
+    staff: AuditorDep,
     db: DbSession,
     record_type: Annotated[str | None, Query(max_length=50)] = None,
     action: Annotated[str | None, Query(max_length=80)] = None,

@@ -3,7 +3,7 @@
 import threading
 import time
 from collections.abc import Callable
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, Header, Request
 from fastapi.responses import JSONResponse
@@ -13,6 +13,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from app.common.responses import error_body
 from app.core.config import Settings, get_settings
 from app.core.exceptions import AppError
+from app.core.redis import REDIS_ERRORS, RedisManager
 
 
 class BodySizeLimitMiddleware:
@@ -40,7 +41,7 @@ class FixedWindowLimiter:
     """Per-process fixed-window counter.
 
     shortcut: state is per worker process and lost on restart. Real enforcement belongs at the
-    proxy/CDN; swap this for a Redis-backed limiter when running several workers.
+    proxy/CDN; with REDIS_URL set, DistributedLimiter (below) is used instead.
     """
 
     def __init__(self, window_seconds: int = 60) -> None:
@@ -63,6 +64,38 @@ class FixedWindowLimiter:
             return None
 
 
+_WINDOW_SCRIPT = """
+local c = redis.call('INCR', KEYS[1])
+local t = redis.call('TTL', KEYS[1])
+if c == 1 or t < 0 then redis.call('EXPIRE', KEYS[1], ARGV[1]) t = tonumber(ARGV[1]) end
+return {c, t}
+"""
+
+
+class DistributedLimiter:
+    """Fixed-window counter shared by all workers via one atomic Lua call.
+
+    If Redis is unavailable it falls back to the per-process limiter: limits stay enforced
+    (never fail open), just per worker.
+    """
+
+    def __init__(self, manager: RedisManager, local: FixedWindowLimiter) -> None:
+        self._manager = manager
+        self._local = local
+
+    def check(self, key: str, limit: int) -> int | None:
+        client = self._manager.client
+        if client is not None:
+            try:
+                count, ttl = client.eval(
+                    _WINDOW_SCRIPT, 1, f"{self._manager.prefix}:rl:{key}", str(self._local.window)
+                )
+                return max(1, int(ttl)) if int(count) > limit else None
+            except REDIS_ERRORS as exc:
+                self._manager.record_failure(exc)
+        return self._local.check(key, limit)
+
+
 def client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
@@ -72,7 +105,7 @@ def rate_limit(name: str, multiplier: int = 1) -> Callable[[Request], None]:
         settings: Settings = request.app.state.settings
         if settings.rate_limit_per_minute == 0:
             return
-        limiter: FixedWindowLimiter = request.app.state.rate_limiter
+        limiter: FixedWindowLimiter | DistributedLimiter = request.app.state.rate_limiter
         retry_after = limiter.check(
             f"{name}:{client_ip(request)}", settings.rate_limit_per_minute * multiplier
         )
@@ -94,6 +127,21 @@ def require_human(
     """Integration point for CAPTCHA/Turnstile. Default verifier allows everything."""
     if not request.app.state.bot_verifier.verify(x_bot_token, client_ip(request)):
         raise AppError("Bot check failed", status_code=403, code="BOT_CHECK_FAILED")
+
+
+def require_human_action(expected_action: str) -> Any:
+    """Dependency factory enforcing an expected Turnstile action on siteverify."""
+
+    def dependency(
+        request: Request,
+        x_bot_token: Annotated[str | None, Header()] = None,
+    ) -> None:
+        if not request.app.state.bot_verifier.verify(
+            x_bot_token, client_ip(request), expected_action=expected_action
+        ):
+            raise AppError("Bot check failed", status_code=403, code="BOT_CHECK_FAILED")
+
+    return dependency
 
 
 SubmissionGuards = [Depends(rate_limit("submit")), Depends(require_human)]

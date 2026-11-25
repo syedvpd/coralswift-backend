@@ -10,12 +10,15 @@ from fastapi.responses import RedirectResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.v1.router import api_router
+from app.core.cache import CacheService, set_cache
+from app.core.cache_hooks import register_cache_hooks
 from app.core.config import Settings, load_settings
 from app.core.constants import REQUEST_ID_HEADER
 from app.core.exception_handlers import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware
-from app.core.protection import BodySizeLimitMiddleware, FixedWindowLimiter
+from app.core.protection import BodySizeLimitMiddleware, DistributedLimiter, FixedWindowLimiter
+from app.core.redis import RedisManager
 from app.core.security import SecurityHeadersMiddleware
 from app.database.session import build_engine, build_sessionmaker
 from app.health.router import router as health_router
@@ -37,6 +40,10 @@ def create_app(
     settings = settings or load_settings()
     configure_logging(settings.log_level)
     engine = build_engine(settings)
+    redis_manager = RedisManager(settings)
+    cache = CacheService(redis_manager, settings)
+    set_cache(cache)
+    register_cache_hooks()
     if settings.scanner_backend == "clamav":
         set_scanner(
             ClamAVScanner(
@@ -53,7 +60,9 @@ def create_app(
         logging.getLogger("app").info(
             "starting", extra={"app_env": settings.app_env, "version": settings.app_version}
         )
+        redis_manager.start()
         yield
+        redis_manager.close()
         engine.dispose()
 
     app = FastAPI(
@@ -72,7 +81,9 @@ def create_app(
     app.state.storage = storage or build_storage(settings)
     app.state.email_sender = email_sender or build_email_sender(settings)
     app.state.bot_verifier = bot_verifier or build_bot_verifier(settings)
-    app.state.rate_limiter = FixedWindowLimiter()
+    app.state.redis = redis_manager
+    app.state.cache = cache
+    app.state.rate_limiter = DistributedLimiter(redis_manager, FixedWindowLimiter())
 
     register_exception_handlers(app)
     app.include_router(health_router)

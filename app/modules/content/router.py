@@ -1,6 +1,7 @@
 """Public content API (/content) and content-admin API (/admin/content)."""
 
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
@@ -10,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.common.pagination import PageDep, page_meta
 from app.common.responses import ApiResponse, ErrorResponse, ok
 from app.common.validation import Long, Short
+from app.core.cache_hooks import NS_PUBLIC_CONTENT
 from app.core.config import Settings, get_settings
 from app.core.protection import rate_limit
 from app.database.dependencies import DbSession
@@ -229,6 +231,18 @@ def _cache(response: Response) -> None:
     response.headers["Cache-Control"] = "public, max-age=300"
 
 
+def _cached[R: BaseModel](
+    request: Request, parts: dict[str, Any], build: Callable[[], R], model: type[R]
+) -> R:
+    """Published-content responses via Redis. Invalidated on any ContentItem commit (cache_hooks).
+    Only service queries for PUBLISHED rows run inside `build`, so drafts cannot enter."""
+    ttl = request.app.state.settings.cache_public_content_ttl_seconds
+    data = request.app.state.cache.get_or_set(
+        NS_PUBLIC_CONTENT, parts, ttl, lambda: build().model_dump(mode="json")
+    )
+    return model.model_validate(data)
+
+
 # ------------------------------------------------------------------ public
 @public.get(
     "",
@@ -236,6 +250,7 @@ def _cache(response: Response) -> None:
     summary="Published content: search, filter by type/category/tag",
 )
 def list_public(
+    request: Request,
     response: Response,
     db: DbSession,
     page: PageDep,
@@ -245,10 +260,18 @@ def list_public(
     tag: Annotated[str | None, Query(max_length=40)] = None,
 ) -> ApiResponse[list[PublicContent]]:  # noqa: A002
     _cache(response)
-    items, total = service.search_published(
-        db, page.page_size, page.offset, q=q, content_type=type, category=category, tag=tag
-    )
-    return ok([_pub(i) for i in items], meta=page_meta(page, total))
+
+    def build() -> ApiResponse[list[PublicContent]]:
+        items, total = service.search_published(
+            db, page.page_size, page.offset, q=q, content_type=type, category=category, tag=tag
+        )
+        return ok([_pub(i) for i in items], meta=page_meta(page, total))
+
+    parts = {
+        "r": "list", "page": page.page, "size": page.page_size, "q": q,
+        "type": type.value if type else None, "category": category, "tag": tag,
+    }  # fmt: skip
+    return _cached(request, parts, build, ApiResponse[list[PublicContent]])
 
 
 class SitemapEntry(BaseModel):
@@ -261,22 +284,33 @@ class SitemapEntry(BaseModel):
     response_model=ApiResponse[list[SitemapEntry]],
     summary="Slugs and last-modified times of published content (SEO)",
 )
-def sitemap(response: Response, db: DbSession) -> ApiResponse[list[SitemapEntry]]:
+def sitemap(request: Request, response: Response, db: DbSession) -> ApiResponse[list[SitemapEntry]]:
     _cache(response)
-    return ok([SitemapEntry(slug=s, updated_at=u) for s, u in service.sitemap(db)])
+    return _cached(
+        request,
+        {"r": "sitemap"},
+        lambda: ok([SitemapEntry(slug=s, updated_at=u) for s, u in service.sitemap(db)]),
+        ApiResponse[list[SitemapEntry]],
+    )
 
 
 @public.get("/{slug}", response_model=ApiResponse[PublicContentDetail], responses=_ERR)
-def get_public(slug: str, response: Response, db: DbSession) -> ApiResponse[PublicContentDetail]:
+def get_public(
+    slug: str, request: Request, response: Response, db: DbSession
+) -> ApiResponse[PublicContentDetail]:
     _cache(response)
-    item = service.get_published(db, slug)
-    return ok(
-        PublicContentDetail(
-            **_pub(item).model_dump(),
-            body=item.body,
-            related=[_pub(r) for r in service.related(db, item)],
+
+    def build() -> ApiResponse[PublicContentDetail]:
+        item = service.get_published(db, slug)  # 404 for anything unpublished: never cached
+        return ok(
+            PublicContentDetail(
+                **_pub(item).model_dump(),
+                body=item.body,
+                related=[_pub(r) for r in service.related(db, item)],
+            )
         )
-    )
+
+    return _cached(request, {"r": "detail", "slug": slug}, build, ApiResponse[PublicContentDetail])
 
 
 @public.get(

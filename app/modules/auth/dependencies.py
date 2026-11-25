@@ -130,15 +130,53 @@ def require_staff(*roles: StaffRole) -> Callable[[AuthContext], StaffContext]:
 
 ReviewerDep = Annotated[
     StaffContext,
-    Depends(require_staff(StaffRole.PARTNER_REVIEWER, StaffRole.SUPER_ADMINISTRATOR)),
+    Depends(
+        require_staff(
+            StaffRole.PARTNER_REVIEWER,
+            StaffRole.COMPLIANCE_OFFICER,
+            StaffRole.SUPER_ADMINISTRATOR,
+        )
+    ),
 ]
 SuperAdminDep = Annotated[StaffContext, Depends(require_staff(StaffRole.SUPER_ADMINISTRATOR))]
+SourcingDep = Annotated[
+    StaffContext,
+    Depends(require_staff(StaffRole.SOURCING_MANAGER, StaffRole.SUPER_ADMINISTRATOR)),
+]
+ComplianceDep = Annotated[
+    StaffContext,
+    Depends(
+        require_staff(
+            StaffRole.COMPLIANCE_OFFICER,
+            StaffRole.PARTNER_REVIEWER,
+            StaffRole.SUPER_ADMINISTRATOR,
+        )
+    ),
+]
+DeliveryDep = Annotated[
+    StaffContext,
+    Depends(require_staff(StaffRole.DELIVERY_MANAGER, StaffRole.SUPER_ADMINISTRATOR)),
+]
+FinanceDep = Annotated[
+    StaffContext,
+    Depends(require_staff(StaffRole.FINANCE, StaffRole.SUPER_ADMINISTRATOR)),
+]
+ApproverDep = Annotated[
+    StaffContext,
+    Depends(require_staff(StaffRole.APPROVER, StaffRole.SUPER_ADMINISTRATOR)),
+]
+AuditorDep = Annotated[
+    StaffContext,
+    Depends(require_staff(StaffRole.AUDITOR, StaffRole.SUPER_ADMINISTRATOR)),
+]
 # Read-only partner collaboration data: BDMs only for organisations assigned to them (D45).
 CollabReadDep = Annotated[
     StaffContext,
     Depends(
         require_staff(
             StaffRole.PARTNER_REVIEWER,
+            StaffRole.COMPLIANCE_OFFICER,
+            StaffRole.DELIVERY_MANAGER,
             StaffRole.SUPER_ADMINISTRATOR,
             StaffRole.BUSINESS_DEVELOPMENT_MANAGER,
         )

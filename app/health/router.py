@@ -33,4 +33,10 @@ def ready(request: Request, db: DbSession) -> ApiResponse[dict[str, str]] | JSON
             "Service is not ready",
             [{"component": "database", "status": "unavailable"}],
         )
-    return ok({"status": "ready", "database": "ok"})
+    # Redis is optional (caches fall back to the DB, limits to per-process), so it never blocks
+    # readiness. The key appears only when Redis is configured; "degraded" is for monitoring.
+    result = {"status": "ready", "database": "ok"}
+    redis = request.app.state.redis
+    if redis.enabled:
+        result["redis"] = "ok" if redis.ping() else "degraded"
+    return ok(result)

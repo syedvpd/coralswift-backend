@@ -7,12 +7,18 @@ class UserType(enum.StrEnum):
 
 
 class StaffRole(enum.StrEnum):
-    """PRD s.14 roles. Phase 2 uses only the first two; the rest are reserved for Phase 3."""
+    """Platform staff roles covering onboarding, project exchange, delivery, finance, and audit."""
 
     PARTNER_REVIEWER = "partner_reviewer"
     SUPER_ADMINISTRATOR = "super_administrator"
     BUSINESS_DEVELOPMENT_MANAGER = "business_development_manager"
     CONTENT_ADMINISTRATOR = "content_administrator"
+    SOURCING_MANAGER = "sourcing_manager"
+    COMPLIANCE_OFFICER = "compliance_officer"
+    DELIVERY_MANAGER = "delivery_manager"
+    FINANCE = "finance"
+    AUDITOR = "auditor"
+    APPROVER = "approver"
 
 
 class UserStatus(enum.StrEnum):

@@ -12,8 +12,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from app.core.cache import CacheService, set_cache  # noqa: E402
+from app.core.cache_hooks import register_cache_hooks  # noqa: E402
 from app.core.config import load_settings  # noqa: E402
 from app.core.logging import configure_logging  # noqa: E402
+from app.core.redis import RedisManager  # noqa: E402
 from app.database.session import build_engine, build_sessionmaker  # noqa: E402
 from app.integrations.email import build_email_sender  # noqa: E402
 from app.integrations.storage import build_storage  # noqa: E402
@@ -29,6 +32,9 @@ def main(argv: list[str] | None = None) -> int:
     settings = load_settings()
     configure_logging(settings.log_level)
     engine = build_engine(settings)
+    # Scheduled publication changes content: drop the public cache after those commits.
+    set_cache(CacheService(RedisManager(settings), settings))
+    register_cache_hooks()
     if args.dry_run:
         print({"dry_run": True, **preview(build_sessionmaker(engine), settings)})
         return 0

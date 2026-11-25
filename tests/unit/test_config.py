@@ -81,6 +81,14 @@ def test_valid_production_config_loads() -> None:
     )
     assert s.is_production
     assert s.cors_allowed_origins == ["https://a.com", "https://b.com"]
+    assert (
+        make(
+            app_env="production",
+            allowed_hosts="api.a.com",
+            turnstile_allowed_hostnames="",
+        ).turnstile_allowed_hostnames
+        == []
+    )
 
 
 @pytest.mark.parametrize(

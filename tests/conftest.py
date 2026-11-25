@@ -1,14 +1,18 @@
 import os
+import uuid
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import pytest
+import redis as redis_lib
 from alembic import command
 from alembic.config import Config
 from dotenv import dotenv_values
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 from sqlalchemy import Engine, create_engine, make_url, text
 from sqlalchemy.orm import Session
 
@@ -33,8 +37,35 @@ def _test_database_url() -> str:
     return url
 
 
+def _test_redis_url() -> str | None:
+    """Optional disposable Redis. When set, EVERY test app runs with Redis caching and
+    distributed rate limiting, so the whole suite exercises the cache paths."""
+    url = os.environ.get("TEST_REDIS_URL") or dotenv_values(ROOT / ".env").get("TEST_REDIS_URL")
+    if url and urlsplit(url).hostname not in ("localhost", "127.0.0.1", "::1"):
+        pytest.exit("TEST_REDIS_URL must point to a local disposable Redis", returncode=2)
+    return url or None
+
+
+TEST_REDIS_PREFIX = "suite"
+
+
+@pytest.fixture(autouse=True)
+def _clean_redis_keys() -> Iterator[None]:
+    """Each test starts with no cache entries or rate-limit counters (only this suite's prefix)."""
+    url = _test_redis_url()
+    if not url:
+        yield
+        return
+    raw = redis_lib.Redis.from_url(url, decode_responses=True)
+    for key in raw.scan_iter(f"{TEST_REDIS_PREFIX}*:*"):
+        raw.delete(key)
+    raw.close()
+    yield
+
+
 @pytest.fixture(scope="session")
 def settings() -> Settings:
+    redis_url = _test_redis_url()
     return Settings(
         _env_file=None,  # tests are self-contained, never read .env
         app_env="testing",
@@ -51,6 +82,8 @@ def settings() -> Settings:
         notify_general_emails=["ops-general@example.test"],
         notify_strategic_emails=["ops-strategic@example.test"],
         notify_partner_emails=["ops-partner@example.test"],
+        redis_url=SecretStr(redis_url) if redis_url else None,
+        redis_key_prefix=TEST_REDIS_PREFIX,
     )
 
 
@@ -144,6 +177,9 @@ def app_factory(
             )
 
         def build(bot_verifier: object | None = None, **overrides: Any) -> FastAPI:
+            if overrides and settings.redis_url and "redis_key_prefix" not in overrides:
+                # An app built from copied settings is a fresh "process": own Redis namespace.
+                overrides["redis_key_prefix"] = f"{TEST_REDIS_PREFIX}-{uuid.uuid4().hex[:6]}"
             cfg = settings.model_copy(update=overrides) if overrides else settings
             application = create_app(
                 cfg,
