@@ -31,6 +31,7 @@ services:
       - {key: BREVO_API_KEY, sync: false}
       - {key: EMAIL_SENDER_ADDRESS, sync: false}
       - {key: EMAIL_SENDER_NAME, value: Coral Swift}
+      - {key: ENQUIRY_REPLY_ENABLED, sync: false}
       - {key: CAPTCHA_ENABLED, value: "true"}
       - {key: TURNSTILE_SECRET_KEY, sync: false}
       - {key: PRIVACY_NOTICE_VERSION, sync: false}

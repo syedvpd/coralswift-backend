@@ -36,6 +36,7 @@ services:
       - {key: BREVO_API_KEY, sync: false}
       - {key: EMAIL_SENDER_ADDRESS, sync: false}
       - {key: EMAIL_SENDER_NAME, value: Coral Swift (staging)}
+      - {key: ENQUIRY_REPLY_ENABLED, sync: false}
       - {key: EMAIL_RECIPIENT_ALLOWLIST, sync: false}  # internal test inboxes only, e.g. qa@yourdomain,@yourdomain
       - {key: PRIVACY_NOTICE_VERSION, sync: false}
       - {key: NOTIFY_GENERAL_EMAILS, sync: false}      # internal inboxes only (must be on the allow-list)
